@@ -10,8 +10,8 @@ anyhow = "1.0.80"
 clap = { version = "4.5.1", features = ["derive"] }
 ndarray = "0.15.6"
 ndarray-stats = "0.5.1"
-ort = { version = "2.0.0-alpha.4", features = ["ndarray", "half", "download-binaries", "copy-dylibs", "cuda"] }
 rayon = "1.9.0"
+rust-bert = "0.22.0"
 rust_tokenizers = "8.1.1"
 serde = "1.0.197"
 serde_json = "1.0.114"

@@ -1,17 +1,13 @@
+use core::future::Future;
 use std::{collections::HashMap, env, path::PathBuf};
 
 use serde::Serialize;
-use serde_json::Value;
 use xitca_web::{
-    body::{self, ResponseBody},
     error::Error,
-    handler::{
-        handler_service,
-        json::{Json, LazyJson},
-        Responder,
-    },
-    http::{const_header_value::JSON, header::CONTENT_TYPE, Response, WebResponse},
+    handler::{handler_service, handler_sync_service, json::LazyJson},
+    http::{request, StatusCode},
     route::{get, post},
+    service::{Service, ServiceExt},
     App,
 };
 
@@ -19,9 +15,14 @@ use anyhow::anyhow;
 use clap::{Parser, ValueEnum};
 use ndarray::{Array2, Axis};
 use ndarray_stats::QuantileExt;
-// use ort::{CUDAExecutionProvider, ExecutionProvider, Session};
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use rayon::slice::ParallelSlice;
+use rust_bert::pipelines::ner::NERModel;
+use rust_bert::pipelines::token_classification::TokenClassificationConfig;
+use rust_bert::pipelines::{
+    common::{ModelResource, ModelType::XLMRoberta},
+    ner::Entity,
+};
 use rust_tokenizers::Mask;
 use rust_tokenizers::{tokenizer::Tokenizer, vocab::Vocab};
 
@@ -53,11 +54,14 @@ struct Args {
     #[arg(short, long, default_value_t = 128)]
     batch_size: usize,
 
-    #[arg(short, long, default_value = "onnx/model.onnx")]
-    model: PathBuf,
+    #[arg(short, long, default_value = "model/rust_model.ot")]
+    model_path: String,
 
-    #[arg(short, long, default_value = "onnx/sentencepiece.bpe.model")]
-    vocab: PathBuf,
+    #[arg(short, long, default_value = "model/config.json")]
+    config_path: String,
+
+    #[arg(short, long, default_value = "model/vocab.json")]
+    vocab_path: String,
 
     // #[arg(short, long, value_enum, default_value = "last")]
     // aggregation: Aggregation,
@@ -135,13 +139,59 @@ async fn post_v1_process(lazy: LazyJson<TextImagerRequest<'_>>) -> Result<&'stat
     Ok("ok")
 }
 
+struct Model {
+    model: NERModel,
+    batch_size: usize,
+}
+
+impl Model {
+    pub fn process<'a>(&self, request: LazyJson<TextImagerRequest<'a>>) -> Result<serde_json::Value, Error> {
+        let request = request.deserialize()?;
+        let entities: Vec<Vec<Entity>> = request
+            .sentences
+            .into_iter()
+            .map(|sentence| &request.text[sentence.begin..sentence.end])
+            .collect::<Vec<&'a str>>()
+            .windows(self.batch_size)
+            .flat_map(|batch| self.model.predict_full_entities(batch))
+            .collect();
+        serde_json::to_value(entities).map_err(Error::from)
+    }
+}
+
+// impl<'a> Service<LazyJson<TextImagerRequest<'a>>> for Model {
+//     type Response = serde_json::Value;
+
+//     type Error = Error;
+
+//     fn call(
+//         &self,
+//         req: LazyJson<TextImagerRequest<'a>>,
+//     ) -> impl Future<Output = Result<Self::Response, Self::Error>> {
+//         let tir: Result<TextImagerRequest, Error> = req.deserialize();
+//         if let Ok(request) = tir {
+//             let result = self.process(request);
+//             std::future::ready()
+//         } else {
+//             std::future::ready(Err(Error::from(StatusCode::BAD_REQUEST)))
+//         }
+//     }
+// }
+
 fn main() -> std::io::Result<()> {
+    let args: Args = Args::parse();
+
+    let model = Model {
+        model: NERModel::new(Default::default()).unwrap(),
+        batch_size: args.batch_size,
+    };
+
     App::new()
         .at(
             "/v1/documentation",
             get(handler_service(get_v1_documentation)),
         )
-        // .at("/v1/process", post(handler_service(post_v1_process)))
+        .at("/v1/process", post(handler_sync_service(|req| model.process(req))))
         .serve()
         .bind("localhost:8080")?
         .run()
