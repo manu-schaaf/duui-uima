@@ -1,30 +1,18 @@
-use core::future::Future;
+use std::sync::{Arc, Mutex};
 use std::{collections::HashMap, env, path::PathBuf};
 
-use serde::Serialize;
-use xitca_web::{
-    error::Error,
-    handler::{handler_service, handler_sync_service, json::LazyJson},
-    http::{request, StatusCode},
-    route::{get, post},
-    service::{Service, ServiceExt},
-    App,
-};
+use actix_files::NamedFile;
+use actix_web::rt::task::spawn_blocking;
+use actix_web::{web, App, HttpResponse, HttpServer, Result};
 
-use anyhow::anyhow;
 use clap::{Parser, ValueEnum};
-use ndarray::{Array2, Axis};
-use ndarray_stats::QuantileExt;
-use rayon::iter::{IntoParallelIterator, ParallelIterator};
-use rayon::slice::ParallelSlice;
-use rust_bert::pipelines::ner::NERModel;
+use rust_bert::pipelines::common::ModelResource;
+use rust_bert::pipelines::ner::{Entity, NERModel};
 use rust_bert::pipelines::token_classification::TokenClassificationConfig;
-use rust_bert::pipelines::{
-    common::{ModelResource, ModelType::XLMRoberta},
-    ner::Entity,
-};
-use rust_tokenizers::Mask;
-use rust_tokenizers::{tokenizer::Tokenizer, vocab::Vocab};
+
+use rust_bert::resources::RemoteResource;
+use rust_bert::roberta::{RobertaModelResources, RobertaVocabResources, RobertaConfigResources};
+use serde::{Deserialize, Serialize};
 
 #[allow(clippy::upper_case_acronyms)]
 #[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, ValueEnum, Debug)]
@@ -36,13 +24,16 @@ enum ImplementedProviders {
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
 struct Args {
-    #[arg(short, long, default_value = "0.0.0.0")]
-    host: String,
+    #[arg(short, long, default_value = "localhost")]
+    address: String,
 
     #[arg(short, long, default_value_t = 9714)]
-    port: usize,
+    port: u16,
 
-    #[arg(short, long, default_value = "cpu")]
+    #[arg(short, long, default_value_t = 4)]
+    workers: usize,
+
+    #[arg(short, long, default_value = "cuda")]
     device: ImplementedProviders,
 
     #[arg(long, default_value_t = 0)]
@@ -51,22 +42,24 @@ struct Args {
     #[arg(short, long)]
     threads: Option<usize>,
 
-    #[arg(short, long, default_value_t = 128)]
+    #[arg(
+        short,
+        long,
+        default_value_t = 128,
+        help = "The batch size for processing"
+    )]
     batch_size: usize,
 
-    #[arg(short, long, default_value = "model/rust_model.ot")]
-    model_path: String,
+    #[arg(long, default_value_t = 16_777_216, help = "The request size limit")]
+    limit: usize,
+    // #[arg(short, long, default_value = "model/rust_model.ot")]
+    // model_path: String,
 
-    #[arg(short, long, default_value = "model/config.json")]
-    config_path: String,
+    // #[arg(short, long, default_value = "model/config.json")]
+    // config_path: String,
 
-    #[arg(short, long, default_value = "model/vocab.json")]
-    vocab_path: String,
-
-    // #[arg(short, long, value_enum, default_value = "last")]
-    // aggregation: Aggregation,
-    #[arg()]
-    corpus: PathBuf,
+    // #[arg(short, long, default_value = "model/vocab.json")]
+    // vocab_path: String,
 }
 
 #[derive(Serialize)]
@@ -84,27 +77,34 @@ struct TextImagerCapability {
 struct TextImagerDocumentation {
     // Name of this annotator
     annotator_name: String,
+
     // Version of this annotator
     version: String,
+
     // Annotator implementation language (Python, Java, ...)
     implementation_lang: Option<String>,
+
     // Optional map of additional meta data
     meta: Option<HashMap<String, String>>,
+
     // Docker container id, if any
     docker_container_id: Option<String>,
+
     // Optional map of supported parameters
     parameters: Option<HashMap<String, String>>,
+
     // Capabilities of this annotator
     capability: TextImagerCapability,
+
     // Analysis engine XML, if available
     implementation_specific: Option<String>,
 }
 
-async fn get_v1_documentation() -> Result<serde_json::Value, Error> {
-    serde_json::to_value(TextImagerDocumentation {
+async fn get_v1_documentation() -> HttpResponse {
+    HttpResponse::Ok().json(TextImagerDocumentation {
         annotator_name: "duui-ner-ort".into(),
         version: env!("CARGO_PKG_VERSION").into(),
-        implementation_lang: Some(format!("Rust {}", env!("CARGO_PKG_RUST_VERSION")).into()),
+        implementation_lang: Some(format!("Rust {}", env!("CARGO_PKG_RUST_VERSION"))),
         meta: None,
         docker_container_id: None,
         parameters: None,
@@ -114,86 +114,104 @@ async fn get_v1_documentation() -> Result<serde_json::Value, Error> {
         },
         implementation_specific: None,
     })
-    .map_err(|err| Error::from(err))
 }
 
-#[derive(serde::Deserialize)]
+async fn get_v1_communication_layer() -> Result<NamedFile> {
+    Ok(NamedFile::open_async("communication_layer.lua").await?)
+}
+
+#[derive(Debug, Serialize, Deserialize)]
 struct DkproSentence {
     begin: usize,
     end: usize,
 }
 
-#[derive(serde::Deserialize)]
-struct TextImagerRequest<'a> {
-    text: &'a str,
-    language: &'a str,
+#[derive(Debug, Serialize, Deserialize)]
+struct TextImagerRequest {
+    text: String,
+    language: String,
     sentences: Vec<DkproSentence>,
 }
 
-async fn post_v1_process(lazy: LazyJson<TextImagerRequest<'_>>) -> Result<&'static str, Error> {
-    let TextImagerRequest {
-        text,
-        language,
-        sentences,
-    } = lazy.deserialize()?;
-    Ok("ok")
+async fn post_v1_process(
+    request: web::Json<TextImagerRequest>,
+    state: web::Data<Arc<AppState>>,
+) -> HttpResponse {
+    let entities: Vec<Vec<Entity>> = request
+        .sentences
+        .iter()
+        .map(|sentence| &request.text[sentence.begin..sentence.end])
+        .collect::<Vec<&'_ str>>()
+        .windows(state.get_ref().batch_size)
+        .flat_map(|batch| {
+            state
+                .get_ref()
+                .model
+                .lock()
+                .unwrap()
+                .predict_full_entities(batch)
+        })
+        .collect();
+    HttpResponse::Ok().json(entities)
 }
 
-struct Model {
-    model: NERModel,
+struct AppState {
+    model: Mutex<NERModel>,
     batch_size: usize,
 }
 
-impl Model {
-    pub fn process<'a>(&self, request: LazyJson<TextImagerRequest<'a>>) -> Result<serde_json::Value, Error> {
-        let request = request.deserialize()?;
-        let entities: Vec<Vec<Entity>> = request
-            .sentences
-            .into_iter()
-            .map(|sentence| &request.text[sentence.begin..sentence.end])
-            .collect::<Vec<&'a str>>()
-            .windows(self.batch_size)
-            .flat_map(|batch| self.model.predict_full_entities(batch))
-            .collect();
-        serde_json::to_value(entities).map_err(Error::from)
-    }
-}
-
-// impl<'a> Service<LazyJson<TextImagerRequest<'a>>> for Model {
-//     type Response = serde_json::Value;
-
-//     type Error = Error;
-
-//     fn call(
-//         &self,
-//         req: LazyJson<TextImagerRequest<'a>>,
-//     ) -> impl Future<Output = Result<Self::Response, Self::Error>> {
-//         let tir: Result<TextImagerRequest, Error> = req.deserialize();
-//         if let Ok(request) = tir {
-//             let result = self.process(request);
-//             std::future::ready()
-//         } else {
-//             std::future::ready(Err(Error::from(StatusCode::BAD_REQUEST)))
-//         }
-//     }
-// }
-
-fn main() -> std::io::Result<()> {
+#[actix_web::main]
+async fn main() -> anyhow::Result<()> {
     let args: Args = Args::parse();
 
-    let model = Model {
-        model: NERModel::new(Default::default()).unwrap(),
+    let model = spawn_blocking(|| {
+        NERModel::new(TokenClassificationConfig {
+            model_type: rust_bert::pipelines::common::ModelType::XLMRoberta,
+            model_resource: ModelResource::Torch(Box::new(RemoteResource::from_pretrained(
+                RobertaModelResources::XLM_ROBERTA_NER_DE,
+            ))),
+            config_resource: Box::new(RemoteResource::from_pretrained(
+                RobertaConfigResources::XLM_ROBERTA_NER_DE,
+            )),
+            vocab_resource: Box::new(RemoteResource::from_pretrained(
+                RobertaVocabResources::XLM_ROBERTA_NER_DE,
+            )),
+            ..Default::default()
+        })
+        .unwrap()
+    })
+    .await?;
+    let state = web::Data::new(AppState {
+        model: Mutex::new(model),
         batch_size: args.batch_size,
-    };
+    });
 
-    App::new()
-        .at(
-            "/v1/documentation",
-            get(handler_service(get_v1_documentation)),
-        )
-        .at("/v1/process", post(handler_sync_service(|req| model.process(req))))
-        .serve()
-        .bind("localhost:8080")?
-        .run()
-        .wait()
+    let accept_all = |_| true;
+    let json_config = web::JsonConfig::default()
+        .content_type_required(false)
+        .content_type(accept_all)
+        .limit(args.limit);
+
+    HttpServer::new(move || {
+        App::new()
+            .app_data(state.clone())
+            .wrap(actix_web::middleware::Logger::default())
+            .wrap(actix_web::middleware::Compress::default())
+            .wrap(
+                actix_web::middleware::DefaultHeaders::default()
+                    .add(("Content-Type", "application/json")),
+            )
+            .app_data(json_config.clone())
+            .service(web::resource("/v1/documentation").route(web::get().to(get_v1_documentation)))
+            .service(
+                web::resource("/v1/communication_layer")
+                    .route(web::get().to(get_v1_communication_layer)),
+            )
+            .service(web::resource("/v1/process").route(web::post().to(post_v1_process)))
+    })
+    .bind((args.address, args.port))?
+    .workers(args.workers)
+    .run()
+    .await
+    .map_err(anyhow::Error::from)
 }
