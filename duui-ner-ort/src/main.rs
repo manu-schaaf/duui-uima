@@ -3,18 +3,17 @@ use std::{collections::HashMap, env};
 
 use actix_files::NamedFile;
 use actix_web::rt::task::spawn_blocking;
-use actix_web::{get, middleware::Logger, post, web, App, HttpResponse, HttpServer, Result};
+use actix_web::{get, post, web, App, HttpResponse, HttpServer, Result};
 
 use clap::{Parser, ValueEnum};
 use rust_bert::pipelines::common::ModelResource;
 use rust_bert::pipelines::ner::{Entity, NERModel};
 use rust_bert::pipelines::token_classification::TokenClassificationConfig;
-
 use rust_bert::resources::RemoteResource;
 use rust_bert::roberta::{RobertaConfigResources, RobertaModelResources, RobertaVocabResources};
 use serde::{Deserialize, Serialize};
 
-use utoipa::{Modify, OpenApi, ToSchema};
+use utoipa::{OpenApi, ToSchema};
 use utoipa_swagger_ui::SwaggerUi;
 
 #[derive(Serialize, ToSchema)]
@@ -59,7 +58,7 @@ struct TextImagerDocumentation {
     utoipa::path(
         path = "/v1/documentation",
         responses(
-            (status = 200, body = TextImagerDocumentation),
+            (status = 200, body = TextImagerDocumentation, content_type = "application/json"),
         )
     )
 ]
@@ -94,28 +93,58 @@ async fn get_v1_communication_layer() -> Result<NamedFile> {
 }
 
 #[derive(Debug, Serialize, Deserialize, ToSchema)]
-struct SentenceOffsets {
-    begin: usize,
-    end: usize,
-}
-
-#[derive(Debug, Serialize, Deserialize, ToSchema)]
 struct TextImagerRequest {
     text: String,
     language: String,
-    sentences: Vec<SentenceOffsets>,
+    sentences: Vec<(usize, usize)>,
 }
 
 #[derive(Debug, Serialize, Deserialize, ToSchema)]
 struct Prediction {
-    entities: Vec<Vec<Entity>>,
+    pub label: String,
+    pub begin: usize,
+    pub end: usize,
+}
+
+impl Prediction {
+    pub fn with_offset(mut self, offset: usize) -> Self {
+        self.begin += offset;
+        self.end += offset;
+        self
+    }
+}
+
+impl From<Entity> for Prediction {
+    fn from(entity: Entity) -> Self {
+        let mut begin = entity.offset.begin as usize;
+        let end = entity.offset.end as usize;
+
+        let word = entity.word.as_str();
+        if word.starts_with(char::is_whitespace) {
+            let word_len = word.len();
+            let stripped_word_len = word.strip_prefix(char::is_whitespace).unwrap().len();
+            begin += word_len - stripped_word_len;
+        }
+
+        Self {
+            label: entity.label,
+            begin,
+            end,
+        }
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
+struct Predictions {
+    pub predictions: Vec<Prediction>,
 }
 
 #[
     utoipa::path(
         path = "/v1/process",
+        request_body = TextImagerRequest,
         responses(
-            (status = 200, body = Prediction),
+            (status = 200, body = Predictions, content_type = "application/json"),
         )
     )
 ]
@@ -124,22 +153,33 @@ async fn post_v1_process(
     request: web::Json<TextImagerRequest>,
     state: web::Data<Arc<AppState>>,
 ) -> HttpResponse {
-    let entities: Vec<Vec<Entity>> = request
+    let (offsets, sentences): (Vec<usize>, Vec<&'_ str>) = request
         .sentences
         .iter()
-        .map(|sentence| &request.text[sentence.begin..sentence.end])
-        .collect::<Vec<&'_ str>>()
-        .windows(state.get_ref().batch_size)
-        .flat_map(|batch| {
-            state
-                .get_ref()
-                .model
-                .lock()
-                .unwrap()
-                .predict_full_entities(batch)
+        .map(|sentence| (sentence.0, &request.text[sentence.0..sentence.1]))
+        .unzip();
+    let state_ref = state.get_ref();
+    let sentence_batches = sentences.chunks(state_ref.batch_size).collect::<Vec<_>>();
+    let predictions = {
+        // Obtain the model lock in a separate scope to release it as soon as possible
+        let model = state_ref.model.lock().unwrap();
+
+        sentence_batches
+            .into_iter()
+            .flat_map(|batch| model.predict_full_entities(batch))
+            .collect::<Vec<Vec<Entity>>>()
+    };
+    let predictions: Vec<Prediction> = predictions
+        .into_iter()
+        .zip(offsets)
+        .flat_map(|(entities, offset)| {
+            entities
+                .into_iter()
+                .map(|entity| Prediction::from(entity).with_offset(offset))
+                .collect::<Vec<Prediction>>()
         })
         .collect();
-    HttpResponse::Ok().json(Prediction { entities })
+    HttpResponse::Ok().json(Predictions { predictions })
 }
 
 #[allow(clippy::upper_case_acronyms)]
@@ -197,16 +237,18 @@ struct AppState {
 
 #[actix_web::main]
 async fn main() -> anyhow::Result<()> {
+    env_logger::init();
+
     #[derive(OpenApi)]
     #[openapi(
-        paths(
-            get_v1_communication_layer,
-            get_v1_documentation,
-            post_v1_process,
-        ),
-        components(
-            schemas(TextImagerDocumentation, TextImagerCapability, TextImagerRequest)
-        ),
+        paths(get_v1_communication_layer, get_v1_documentation, post_v1_process,),
+        components(schemas(
+            TextImagerDocumentation,
+            TextImagerCapability,
+            TextImagerRequest,
+            Prediction,
+            Predictions
+        ))
     )]
     struct ApiDoc;
     let openapi = ApiDoc::openapi();
@@ -230,11 +272,13 @@ async fn main() -> anyhow::Result<()> {
         .unwrap()
     })
     .await?;
-    let state = web::Data::new(AppState {
+    let state = web::Data::new(Arc::new(AppState {
         model: Mutex::new(model),
         batch_size: args.batch_size,
-    });
+    }));
 
+    // Configure server to accept all requests as JSON
+    // regardless of set Content-Type and enable large request bodies
     let accept_all = |_| true;
     let json_config = web::JsonConfig::default()
         .content_type_required(false)
@@ -245,6 +289,7 @@ async fn main() -> anyhow::Result<()> {
         App::new()
             .app_data(state.clone())
             .wrap(actix_web::middleware::Logger::default())
+            .wrap(actix_web::middleware::Logger::new("%a %{User-Agent}i"))
             .wrap(actix_web::middleware::Compress::default())
             .wrap(
                 actix_web::middleware::DefaultHeaders::default()
