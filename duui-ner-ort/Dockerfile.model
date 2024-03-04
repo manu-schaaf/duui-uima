@@ -1,0 +1,12 @@
+FROM docker.texttechnologylab.org/onnxruntime/cuda:latest as base
+
+FROM base as hf
+
+RUN pip install huggingface_hub
+
+WORKDIR /app/
+
+ARG MODEL_REPO
+ARG MODEL_FILES="onnx/"
+
+RUN huggingface-cli download ${MODEL_REPO} ${MODEL_FILES}

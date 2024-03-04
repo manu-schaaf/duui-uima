@@ -1,0 +1,17 @@
+build-onnx:
+    #!/bin/bash
+    cd dependencies/onnxruntime;
+    current_commit=$(git rev-parse --short HEAD);
+    docker build -f dockerfiles/Dockerfile.cuda -t docker.texttechnologylab.org/onnxruntime/cuda:$current_commit .;
+    docker tag docker.texttechnologylab.org/onnxruntime/cuda:$current_commit docker.texttechnologylab.org/onnxruntime/cuda:latest;
+
+push-onnx:
+    just build-onnx;
+    docker push docker.texttechnologylab.org/onnxruntime/cuda:$commit;
+    docker push docker.texttechnologylab.org/onnxruntime/cuda:latest;
+
+build-model:
+    just build-onnx;
+    docker build -f Dockerfile.model \
+        --build-arg="MODEL_REPO=FacebookAI/xlm-roberta-large-finetuned-conll03-german" \
+        --build-arg="MODEL_FILES=FacebookAI/xlm-roberta-large-finetuned-conll03-german" \

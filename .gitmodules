@@ -1,3 +1,6 @@
 [submodule "duui-gervader/src/main/docker/python/gervader"]
 	path = duui-gervader/src/main/docker/python/gervader
 	url = https://github.com/Myyyvothrr/GerVADER
+[submodule "duui-ner-ort/dependencies/onnxruntime"]
+	path = duui-ner-ort/dependencies/onnxruntime
+	url = git@github.com:microsoft/onnxruntime.git
