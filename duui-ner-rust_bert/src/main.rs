@@ -1,186 +1,23 @@
+mod routes;
 mod schema;
+mod util;
 
 use std::sync::{Arc, Mutex};
 
-use actix_files::NamedFile;
 use actix_web::rt::task::spawn_blocking;
-use actix_web::{get, post, web, App, HttpResponse, HttpServer, Result};
+use actix_web::{web, App, HttpServer};
 
 use clap::Parser;
-use rust_bert::bert::{BertConfigResources, BertModelResources, BertVocabResources};
-use rust_bert::pipelines::common::ModelResource;
-use rust_bert::pipelines::ner::{Entity, NERModel};
-use rust_bert::pipelines::token_classification::TokenClassificationConfig;
-use rust_bert::resources::RemoteResource;
-use rust_bert::roberta::{RobertaConfigResources, RobertaModelResources, RobertaVocabResources};
+use rust_bert::pipelines::ner::NERModel;
 
 use tch::Device;
 
 use utoipa::OpenApi;
 use utoipa_swagger_ui::SwaggerUi;
 
+use routes::*;
 use schema::*;
-
-#[
-    utoipa::path(
-        path = "/v1/documentation",
-        responses(
-            (status = 200, body = TextImagerDocumentation, content_type = "application/json"),
-        )
-    )
-]
-#[get("/v1/documentation")]
-async fn get_v1_documentation() -> HttpResponse {
-    HttpResponse::Ok().json(TextImagerDocumentation {
-        annotator_name: "duui-ner-ort".into(),
-        capability: TextImagerCapability {
-            supported_languages: vec!["de".into()],
-            reproducible: true,
-        },
-        ..Default::default()
-    })
-}
-
-#[
-    utoipa::path(
-        path = "/v1/communication_layer",
-        responses(
-            (status = 200, body = String, content_type = "application/x-lua"),
-        )
-    )
-]
-#[get("/v1/communication_layer")]
-async fn get_v1_communication_layer() -> Result<NamedFile> {
-    Ok(NamedFile::open_async("communication_layer.lua").await?)
-}
-
-#[
-    utoipa::path(
-        path = "/v1/process",
-        request_body = TextImagerRequest,
-        responses(
-            (status = 200, body = TextImagerResponse, content_type = "application/json"),
-        )
-    )
-]
-#[post("/v1/process")]
-async fn post_v1_process(
-    request: web::Json<TextImagerRequest>,
-    state: web::Data<Arc<AppState>>,
-) -> HttpResponse {
-    let (sentences, offsets): (Vec<String>, Vec<usize>) = request.sentences_and_offsets();
-
-    let state_ref = state.get_ref();
-    let sentence_batches = sentences.chunks(state_ref.batch_size).collect::<Vec<_>>();
-    let predictions = {
-        // Obtain the model lock in a separate scope to release it as soon as possible
-        let model = state_ref.model.lock().unwrap();
-
-        sentence_batches
-            .into_iter()
-            .flat_map(|batch| model.predict_full_entities(batch))
-            .collect::<Vec<Vec<Entity>>>()
-    };
-    let predictions: Vec<TextImagerPrediction> = predictions
-        .into_iter()
-        .zip(offsets)
-        .flat_map(|(entities, offset)| {
-            entities
-                .into_iter()
-                .map(|entity| TextImagerPrediction::from(entity).with_offset(offset))
-                .collect::<Vec<TextImagerPrediction>>()
-        })
-        .collect();
-    HttpResponse::Ok().json(TextImagerResponse::new(predictions, None))
-}
-
-fn parse_device(device: &str) -> anyhow::Result<Device> {
-    match device.split(":").collect::<Vec<_>>().as_slice() {
-        ["cpu"] => Ok(Device::Cpu),
-        ["cuda" | "gpu"] => Ok(Device::Cuda(0)),
-        ["cuda" | "gpu", index] => Ok(Device::Cuda(index.parse()?)),
-        ["mps"] => Ok(Device::Mps),
-        ["vulkan"] => Ok(Device::Vulkan),
-        _ => anyhow::bail!("Invalid device choice: {device}"),
-    }
-}
-
-#[derive(Debug, Clone)]
-enum ModelChoiceAndLanguages {
-    Bert,
-    XlmRoberta(String),
-}
-
-fn parse_model_arg(model: &str) -> anyhow::Result<ModelChoiceAndLanguages> {
-    match model
-        .to_lowercase()
-        .as_str()
-        .split(":")
-        .collect::<Vec<&str>>()
-        .as_slice()
-    {
-        ["bert"] => Ok(ModelChoiceAndLanguages::Bert),
-        ["xlm-roberta"] => Ok(ModelChoiceAndLanguages::XlmRoberta("de".into())),
-        ["xlm-roberta", lang] => Ok(ModelChoiceAndLanguages::XlmRoberta((*lang).into())),
-        _ => anyhow::bail!("Invalid model choice: {model}"),
-    }
-}
-
-fn get_model_config(
-    model: ModelChoiceAndLanguages,
-    batch_size: usize,
-    device: Device,
-) -> anyhow::Result<TokenClassificationConfig> {
-    match model {
-        ModelChoiceAndLanguages::Bert => Ok(TokenClassificationConfig {
-            model_type: rust_bert::pipelines::common::ModelType::Bert,
-            model_resource: ModelResource::Torch(box_resource(BertModelResources::BERT_NER)),
-            config_resource: box_resource(BertConfigResources::BERT_NER),
-            vocab_resource: box_resource(BertVocabResources::BERT_NER),
-            batch_size,
-            device,
-            ..Default::default()
-        }),
-        ModelChoiceAndLanguages::XlmRoberta(lang) => {
-            let choice = match lang.to_lowercase().as_str() {
-                "de" => (
-                    RobertaModelResources::XLM_ROBERTA_NER_DE,
-                    RobertaConfigResources::XLM_ROBERTA_NER_DE,
-                    RobertaVocabResources::XLM_ROBERTA_NER_DE,
-                ),
-                "en" => (
-                    RobertaModelResources::XLM_ROBERTA_NER_EN,
-                    RobertaConfigResources::XLM_ROBERTA_NER_EN,
-                    RobertaVocabResources::XLM_ROBERTA_NER_EN,
-                ),
-                "nl" => (
-                    RobertaModelResources::XLM_ROBERTA_NER_NL,
-                    RobertaConfigResources::XLM_ROBERTA_NER_NL,
-                    RobertaVocabResources::XLM_ROBERTA_NER_NL,
-                ),
-                "es" => (
-                    RobertaModelResources::XLM_ROBERTA_NER_ES,
-                    RobertaConfigResources::XLM_ROBERTA_NER_ES,
-                    RobertaVocabResources::XLM_ROBERTA_NER_ES,
-                ),
-                unknown => anyhow::bail!("Unknown language: {unknown}"),
-            };
-            Ok(TokenClassificationConfig {
-                model_type: rust_bert::pipelines::common::ModelType::XLMRoberta,
-                model_resource: ModelResource::Torch(box_resource(choice.0)),
-                config_resource: box_resource(choice.1),
-                vocab_resource: box_resource(choice.2),
-                batch_size,
-                device,
-                ..Default::default()
-            })
-        }
-    }
-}
-
-fn box_resource(resouce: (&str, &str)) -> Box<RemoteResource> {
-    Box::new(RemoteResource::from_pretrained(resouce))
-}
+use util::*;
 
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
@@ -210,11 +47,6 @@ struct Args {
 
     #[arg(long, default_value_t = false)]
     load_and_exit: bool,
-}
-
-struct AppState {
-    model: Mutex<NERModel>,
-    batch_size: usize,
 }
 
 fn get_json_config() -> web::JsonConfig {
@@ -253,7 +85,7 @@ async fn main() -> anyhow::Result<()> {
     let args: Args = Args::parse();
 
     let config = get_model_config(args.model, args.batch_size, args.device)?;
-    
+
     if args.load_and_exit {
         NERModel::new(config)?;
         return Ok(());
@@ -293,6 +125,13 @@ async fn main() -> anyhow::Result<()> {
 #[cfg(test)]
 mod test {
     use actix_web::test;
+
+    use rust_bert::pipelines::common::ModelResource;
+    use rust_bert::pipelines::token_classification::TokenClassificationConfig;
+    use rust_bert::resources::RemoteResource;
+    use rust_bert::roberta::{
+        RobertaConfigResources, RobertaModelResources, RobertaVocabResources,
+    };
 
     use super::*;
 
@@ -348,7 +187,7 @@ mod test {
 
         let request = test::TestRequest::post()
             .uri("/v1/process")
-            .set_json(&TextImagerRequest {
+            .set_json(TextImagerRequest {
                 text: TEXT.into(),
                 language: "de".into(),
                 sentences: SENTENCE_OFFSETS.into_iter().collect(),
