@@ -19,6 +19,7 @@ rust-bert = { version = "0.22.0" }
 rust_tokenizers = "*"
 serde = "1.0.197"
 serde_json = "1.0.114"
+tch = "*"
 thiserror = "1.0.57"
 utoipa = { version = "4", features = ["actix_extras"] }
 utoipa-swagger-ui = { version = "6.0.0", features = ["actix-web"] }

@@ -13,6 +13,8 @@ use rust_bert::pipelines::token_classification::TokenClassificationConfig;
 use rust_bert::resources::RemoteResource;
 use rust_bert::roberta::{RobertaConfigResources, RobertaModelResources, RobertaVocabResources};
 
+use tch::{Device, Kind};
+
 use utoipa::OpenApi;
 use utoipa_swagger_ui::SwaggerUi;
 
@@ -91,11 +93,15 @@ async fn post_v1_process(
     HttpResponse::Ok().json(TextImagerResponse::new(predictions, None))
 }
 
-#[allow(clippy::upper_case_acronyms)]
-#[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, ValueEnum, Debug)]
-enum ImplementedProviders {
-    CPU,
-    CUDA,
+fn parse_device(device: &str) -> anyhow::Result<Device> {
+    match device.split(":").collect::<Vec<_>>().as_slice() {
+        ["cpu"] => Ok(Device::Cpu),
+        ["cuda" | "gpu"] => Ok(Device::Cuda(0)),
+        ["cuda" | "gpu", index] => Ok(Device::Cuda(index.parse()?)),
+        ["mps"] => Ok(Device::Mps),
+        ["vulkan"] => Ok(Device::Vulkan),
+        _ => todo!(),
+    }
 }
 
 #[derive(Parser, Debug)]
@@ -107,17 +113,11 @@ struct Args {
     #[arg(short, long, default_value_t = 9714)]
     port: u16,
 
-    #[arg(short, long, default_value_t = 1)]
+    #[arg(short, long, default_value_t = 2)]
     workers: usize,
 
-    #[arg(short, long, default_value = "cuda")]
-    device: ImplementedProviders,
-
-    #[arg(long, default_value_t = 0)]
-    device_id: usize,
-
-    #[arg(short, long)]
-    threads: Option<usize>,
+    #[arg(short, long, default_value = "cuda:0", value_parser = parse_device)]
+    device: Device,
 
     #[arg(
         short,
@@ -126,9 +126,6 @@ struct Args {
         help = "The batch size for the rust_bert::NERModel"
     )]
     batch_size: usize,
-
-    #[arg(long, default_value_t = 16_777_215, help = "The request size limit")]
-    limit: usize,
     // #[arg(short, long, default_value = "model/rust_model.ot")]
     // model_path: String,
 
@@ -193,6 +190,7 @@ async fn main() -> anyhow::Result<()> {
                 RobertaVocabResources::XLM_ROBERTA_NER_DE,
             )),
             batch_size: args.batch_size,
+            device: args.device,
             ..Default::default()
         })
         .unwrap()
