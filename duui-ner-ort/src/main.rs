@@ -1,5 +1,6 @@
+mod schema;
+
 use std::sync::{Arc, Mutex};
-use std::{collections::HashMap, env};
 
 use actix_files::NamedFile;
 use actix_web::rt::task::spawn_blocking;
@@ -11,48 +12,11 @@ use rust_bert::pipelines::ner::{Entity, NERModel};
 use rust_bert::pipelines::token_classification::TokenClassificationConfig;
 use rust_bert::resources::RemoteResource;
 use rust_bert::roberta::{RobertaConfigResources, RobertaModelResources, RobertaVocabResources};
-use serde::{Deserialize, Serialize};
 
-use utoipa::{OpenApi, ToSchema};
+use utoipa::OpenApi;
 use utoipa_swagger_ui::SwaggerUi;
 
-#[derive(Serialize, ToSchema)]
-struct TextImagerCapability {
-    // List of supported languages by the annotator
-    // TODO how to handle language?
-    // - ISO 639-1 (two letter codes) as default in meta data
-    // - ISO 639-3 (three letters) optionally in extra meta to allow a finer mapping
-    supported_languages: Vec<String>,
-    // Are results on same inputs reproducible without side effects?
-    reproducible: bool,
-}
-
-#[derive(Serialize, ToSchema)]
-struct TextImagerDocumentation {
-    // Name of this annotator
-    annotator_name: String,
-
-    // Version of this annotator
-    version: String,
-
-    // Annotator implementation language (Python, Java, ...)
-    implementation_lang: Option<String>,
-
-    // Optional map of additional meta data
-    meta: Option<HashMap<String, String>>,
-
-    // Docker container id, if any
-    docker_container_id: Option<String>,
-
-    // Optional map of supported parameters
-    parameters: Option<HashMap<String, String>>,
-
-    // Capabilities of this annotator
-    capability: TextImagerCapability,
-
-    // Analysis engine XML, if available
-    implementation_specific: Option<String>,
-}
+use schema::*;
 
 #[
     utoipa::path(
@@ -66,16 +30,11 @@ struct TextImagerDocumentation {
 async fn get_v1_documentation() -> HttpResponse {
     HttpResponse::Ok().json(TextImagerDocumentation {
         annotator_name: "duui-ner-ort".into(),
-        version: env!("CARGO_PKG_VERSION").into(),
-        implementation_lang: Some(format!("Rust {}", env!("CARGO_PKG_RUST_VERSION"))),
-        meta: None,
-        docker_container_id: None,
-        parameters: None,
         capability: TextImagerCapability {
             supported_languages: vec!["de".into()],
             reproducible: true,
         },
-        implementation_specific: None,
+        ..Default::default()
     })
 }
 
@@ -90,73 +49,6 @@ async fn get_v1_documentation() -> HttpResponse {
 #[get("/v1/communication_layer")]
 async fn get_v1_communication_layer() -> Result<NamedFile> {
     Ok(NamedFile::open_async("communication_layer.lua").await?)
-}
-
-#[derive(Debug, Serialize, Deserialize, ToSchema)]
-struct TextImagerRequest {
-    text: String,
-    language: String,
-    sentences: Vec<SentenceOffsets>,
-}
-
-impl TextImagerRequest {
-    pub fn sentences_and_offsets<'a>(&'a self) -> (Vec<&'a str>, Vec<usize>) {
-        self.sentences_with_offsets().unzip()
-    }
-
-    #[inline(always)]
-    fn sentences_with_offsets<'a>(&'a self) -> impl Iterator<Item = (&'a str, usize)> {
-        self.sentences
-            .iter()
-            .map(|sentence| (&self.text[sentence.begin..=sentence.end], sentence.begin))
-    }
-}
-
-#[derive(Debug, Serialize, Deserialize, ToSchema)]
-struct SentenceOffsets {
-    begin: usize,
-    end: usize,
-}
-
-#[derive(Debug, Serialize, Deserialize, ToSchema)]
-struct TextImagerPrediction {
-    pub label: String,
-    pub begin: usize,
-    pub end: usize,
-}
-
-impl TextImagerPrediction {
-    pub fn with_offset(mut self, offset: usize) -> Self {
-        self.begin += offset;
-        self.end += offset;
-        self
-    }
-}
-
-#[derive(Debug, Serialize, Deserialize, Default, ToSchema)]
-struct TextImagerResponse {
-    predictions: Vec<TextImagerPrediction>,
-    meta: Option<HashMap<String, String>>,
-}
-
-impl From<Entity> for TextImagerPrediction {
-    fn from(entity: Entity) -> Self {
-        let mut begin = entity.offset.begin as usize;
-        let end = entity.offset.end as usize;
-
-        let word = entity.word.as_str();
-        if word.starts_with(char::is_whitespace) {
-            let word_len = word.len();
-            let stripped_word_len = word.trim_start().len();
-            begin += word_len - stripped_word_len;
-        }
-
-        Self {
-            label: entity.label,
-            begin,
-            end,
-        }
-    }
 }
 
 #[
@@ -196,10 +88,7 @@ async fn post_v1_process(
                 .collect::<Vec<TextImagerPrediction>>()
         })
         .collect();
-    HttpResponse::Ok().json(TextImagerResponse {
-        predictions,
-        ..Default::default()
-    })
+    HttpResponse::Ok().json(TextImagerResponse::new(predictions))
 }
 
 #[allow(clippy::upper_case_acronyms)]
