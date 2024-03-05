@@ -96,17 +96,23 @@ async fn get_v1_communication_layer() -> Result<NamedFile> {
 struct TextImagerRequest {
     text: String,
     language: String,
-    sentences: Vec<(usize, usize)>,
+    sentences: Vec<SentenceOffsets>,
 }
 
 #[derive(Debug, Serialize, Deserialize, ToSchema)]
-struct Prediction {
+struct SentenceOffsets {
+    begin: usize,
+    end: usize,
+}
+
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
+struct TextImagerPrediction {
     pub label: String,
     pub begin: usize,
     pub end: usize,
 }
 
-impl Prediction {
+impl TextImagerPrediction {
     pub fn with_offset(mut self, offset: usize) -> Self {
         self.begin += offset;
         self.end += offset;
@@ -114,7 +120,13 @@ impl Prediction {
     }
 }
 
-impl From<Entity> for Prediction {
+#[derive(Debug, Serialize, Deserialize, Default, ToSchema)]
+struct TextImagerResponse {
+    predictions: Vec<TextImagerPrediction>,
+    meta: Option<HashMap<String, String>>,
+}
+
+impl From<Entity> for TextImagerPrediction {
     fn from(entity: Entity) -> Self {
         let mut begin = entity.offset.begin as usize;
         let end = entity.offset.end as usize;
@@ -122,7 +134,7 @@ impl From<Entity> for Prediction {
         let word = entity.word.as_str();
         if word.starts_with(char::is_whitespace) {
             let word_len = word.len();
-            let stripped_word_len = word.strip_prefix(char::is_whitespace).unwrap().len();
+            let stripped_word_len = word.trim_start().len();
             begin += word_len - stripped_word_len;
         }
 
@@ -134,17 +146,12 @@ impl From<Entity> for Prediction {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize, ToSchema)]
-struct Predictions {
-    pub predictions: Vec<Prediction>,
-}
-
 #[
     utoipa::path(
         path = "/v1/process",
         request_body = TextImagerRequest,
         responses(
-            (status = 200, body = Predictions, content_type = "application/json"),
+            (status = 200, body = TextImagerResponse, content_type = "application/json"),
         )
     )
 ]
@@ -156,8 +163,9 @@ async fn post_v1_process(
     let (offsets, sentences): (Vec<usize>, Vec<&'_ str>) = request
         .sentences
         .iter()
-        .map(|sentence| (sentence.0, &request.text[sentence.0..sentence.1]))
+        .map(|sentence| (sentence.begin, &request.text[sentence.begin..=sentence.end]))
         .unzip();
+
     let state_ref = state.get_ref();
     let sentence_batches = sentences.chunks(state_ref.batch_size).collect::<Vec<_>>();
     let predictions = {
@@ -169,17 +177,20 @@ async fn post_v1_process(
             .flat_map(|batch| model.predict_full_entities(batch))
             .collect::<Vec<Vec<Entity>>>()
     };
-    let predictions: Vec<Prediction> = predictions
+    let predictions: Vec<TextImagerPrediction> = predictions
         .into_iter()
         .zip(offsets)
         .flat_map(|(entities, offset)| {
             entities
                 .into_iter()
-                .map(|entity| Prediction::from(entity).with_offset(offset))
-                .collect::<Vec<Prediction>>()
+                .map(|entity| TextImagerPrediction::from(entity).with_offset(offset))
+                .collect::<Vec<TextImagerPrediction>>()
         })
         .collect();
-    HttpResponse::Ok().json(Predictions { predictions })
+    HttpResponse::Ok().json(TextImagerResponse {
+        predictions,
+        ..Default::default()
+    })
 }
 
 #[allow(clippy::upper_case_acronyms)]
@@ -243,11 +254,12 @@ async fn main() -> anyhow::Result<()> {
     #[openapi(
         paths(get_v1_communication_layer, get_v1_documentation, post_v1_process,),
         components(schemas(
-            TextImagerDocumentation,
+            SentenceOffsets,
             TextImagerCapability,
+            TextImagerDocumentation,
+            TextImagerPrediction,
             TextImagerRequest,
-            Prediction,
-            Predictions
+            TextImagerResponse,
         ))
     )]
     struct ApiDoc;
