@@ -99,6 +99,19 @@ struct TextImagerRequest {
     sentences: Vec<SentenceOffsets>,
 }
 
+impl TextImagerRequest {
+    pub fn sentences_and_offsets<'a>(&'a self) -> (Vec<&'a str>, Vec<usize>) {
+        self.sentences_with_offsets().unzip()
+    }
+
+    #[inline(always)]
+    fn sentences_with_offsets<'a>(&'a self) -> impl Iterator<Item = (&'a str, usize)> {
+        self.sentences
+            .iter()
+            .map(|sentence| (&self.text[sentence.begin..=sentence.end], sentence.begin))
+    }
+}
+
 #[derive(Debug, Serialize, Deserialize, ToSchema)]
 struct SentenceOffsets {
     begin: usize,
@@ -160,11 +173,7 @@ async fn post_v1_process(
     request: web::Json<TextImagerRequest>,
     state: web::Data<Arc<AppState>>,
 ) -> HttpResponse {
-    let (offsets, sentences): (Vec<usize>, Vec<&'_ str>) = request
-        .sentences
-        .iter()
-        .map(|sentence| (sentence.begin, &request.text[sentence.begin..=sentence.end]))
-        .unzip();
+    let (sentences, offsets): (Vec<&str>, Vec<usize>) = request.sentences_and_offsets();
 
     let state_ref = state.get_ref();
     let sentence_batches = sentences.chunks(state_ref.batch_size).collect::<Vec<_>>();
