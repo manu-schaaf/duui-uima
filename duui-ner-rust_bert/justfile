@@ -10,6 +10,10 @@ push-onnx:
     docker push docker.texttechnologylab.org/onnxruntime/cuda:$commit;
     docker push docker.texttechnologylab.org/onnxruntime/cuda:latest;
 
+build:
+    #!/bin/bash
+    docker build -f Dockerfile -t docker.texttechnologylab.org/duui-ner-rust_bert:latest .
+
 build-model:
     just build-onnx;
     docker build -f Dockerfile.model \

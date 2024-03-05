@@ -6,14 +6,15 @@ use actix_files::NamedFile;
 use actix_web::rt::task::spawn_blocking;
 use actix_web::{get, post, web, App, HttpResponse, HttpServer, Result};
 
-use clap::{Parser, ValueEnum};
+use clap::Parser;
+use rust_bert::bert::{BertConfigResources, BertModelResources, BertVocabResources};
 use rust_bert::pipelines::common::ModelResource;
 use rust_bert::pipelines::ner::{Entity, NERModel};
 use rust_bert::pipelines::token_classification::TokenClassificationConfig;
 use rust_bert::resources::RemoteResource;
 use rust_bert::roberta::{RobertaConfigResources, RobertaModelResources, RobertaVocabResources};
 
-use tch::{Device, Kind};
+use tch::Device;
 
 use utoipa::OpenApi;
 use utoipa_swagger_ui::SwaggerUi;
@@ -100,8 +101,85 @@ fn parse_device(device: &str) -> anyhow::Result<Device> {
         ["cuda" | "gpu", index] => Ok(Device::Cuda(index.parse()?)),
         ["mps"] => Ok(Device::Mps),
         ["vulkan"] => Ok(Device::Vulkan),
-        _ => todo!(),
+        _ => anyhow::bail!("Invalid device choice: {device}"),
     }
+}
+
+#[derive(Debug, Clone)]
+enum ModelChoiceAndLanguages {
+    Bert,
+    XlmRoberta(String),
+}
+
+fn parse_model_arg(model: &str) -> anyhow::Result<ModelChoiceAndLanguages> {
+    match model
+        .to_lowercase()
+        .as_str()
+        .split(":")
+        .collect::<Vec<&str>>()
+        .as_slice()
+    {
+        ["bert"] => Ok(ModelChoiceAndLanguages::Bert),
+        ["xlm-roberta"] => Ok(ModelChoiceAndLanguages::XlmRoberta("de".into())),
+        ["xlm-roberta", lang] => Ok(ModelChoiceAndLanguages::XlmRoberta((*lang).into())),
+        _ => anyhow::bail!("Invalid model choice: {model}"),
+    }
+}
+
+fn get_model_config(
+    model: ModelChoiceAndLanguages,
+    batch_size: usize,
+    device: Device,
+) -> anyhow::Result<TokenClassificationConfig> {
+    match model {
+        ModelChoiceAndLanguages::Bert => Ok(TokenClassificationConfig {
+            model_type: rust_bert::pipelines::common::ModelType::Bert,
+            model_resource: ModelResource::Torch(box_resource(BertModelResources::BERT_NER)),
+            config_resource: box_resource(BertConfigResources::BERT_NER),
+            vocab_resource: box_resource(BertVocabResources::BERT_NER),
+            batch_size,
+            device,
+            ..Default::default()
+        }),
+        ModelChoiceAndLanguages::XlmRoberta(lang) => {
+            let choice = match lang.to_lowercase().as_str() {
+                "de" => (
+                    RobertaModelResources::XLM_ROBERTA_NER_DE,
+                    RobertaConfigResources::XLM_ROBERTA_NER_DE,
+                    RobertaVocabResources::XLM_ROBERTA_NER_DE,
+                ),
+                "en" => (
+                    RobertaModelResources::XLM_ROBERTA_NER_EN,
+                    RobertaConfigResources::XLM_ROBERTA_NER_EN,
+                    RobertaVocabResources::XLM_ROBERTA_NER_EN,
+                ),
+                "nl" => (
+                    RobertaModelResources::XLM_ROBERTA_NER_NL,
+                    RobertaConfigResources::XLM_ROBERTA_NER_NL,
+                    RobertaVocabResources::XLM_ROBERTA_NER_NL,
+                ),
+                "es" => (
+                    RobertaModelResources::XLM_ROBERTA_NER_ES,
+                    RobertaConfigResources::XLM_ROBERTA_NER_ES,
+                    RobertaVocabResources::XLM_ROBERTA_NER_ES,
+                ),
+                unknown => anyhow::bail!("Unknown language: {unknown}"),
+            };
+            Ok(TokenClassificationConfig {
+                model_type: rust_bert::pipelines::common::ModelType::XLMRoberta,
+                model_resource: ModelResource::Torch(box_resource(choice.0)),
+                config_resource: box_resource(choice.1),
+                vocab_resource: box_resource(choice.2),
+                batch_size,
+                device,
+                ..Default::default()
+            })
+        }
+    }
+}
+
+fn box_resource(resouce: (&str, &str)) -> Box<RemoteResource> {
+    Box::new(RemoteResource::from_pretrained(resouce))
 }
 
 #[derive(Parser, Debug)]
@@ -126,14 +204,17 @@ struct Args {
         help = "The batch size for the rust_bert::NERModel"
     )]
     batch_size: usize,
-    // #[arg(short, long, default_value = "model/rust_model.ot")]
-    // model_path: String,
 
-    // #[arg(short, long, default_value = "model/config.json")]
-    // config_path: String,
+    #[arg(long, default_value = "XLM-RoBERTa:de", value_parser = parse_model_arg)]
+    model: ModelChoiceAndLanguages,
 
-    // #[arg(short, long, default_value = "model/vocab.json")]
-    // vocab_path: String,
+    #[arg(long, default_value_t = false)]
+    load_and_exit: bool,
+}
+
+struct AppState {
+    model: Mutex<NERModel>,
+    batch_size: usize,
 }
 
 fn get_json_config() -> web::JsonConfig {
@@ -148,11 +229,6 @@ fn get_json_config() -> web::JsonConfig {
         .content_type_required(false)
         .content_type(accept_all)
         .limit(limit)
-}
-
-struct AppState {
-    model: Mutex<NERModel>,
-    batch_size: usize,
 }
 
 #[actix_web::main]
@@ -175,34 +251,20 @@ async fn main() -> anyhow::Result<()> {
     let openapi = ApiDoc::openapi();
 
     let args: Args = Args::parse();
-    dbg!(&args);
 
-    let model = spawn_blocking(move || {
-        NERModel::new(TokenClassificationConfig {
-            model_type: rust_bert::pipelines::common::ModelType::XLMRoberta,
-            model_resource: ModelResource::Torch(Box::new(RemoteResource::from_pretrained(
-                RobertaModelResources::XLM_ROBERTA_NER_DE,
-            ))),
-            config_resource: Box::new(RemoteResource::from_pretrained(
-                RobertaConfigResources::XLM_ROBERTA_NER_DE,
-            )),
-            vocab_resource: Box::new(RemoteResource::from_pretrained(
-                RobertaVocabResources::XLM_ROBERTA_NER_DE,
-            )),
-            batch_size: args.batch_size,
-            device: args.device,
-            ..Default::default()
-        })
-        .unwrap()
-    })
-    .await?;
+    let config = get_model_config(args.model, args.batch_size, args.device)?;
+    
+    if args.load_and_exit {
+        NERModel::new(config)?;
+        return Ok(());
+    }
+
+    let model = spawn_blocking(move || NERModel::new(config).unwrap()).await?;
+
     let state = web::Data::new(Arc::new(AppState {
         model: Mutex::new(model),
         batch_size: args.batch_size,
     }));
-
-    let json_config = get_json_config();
-
     HttpServer::new(move || {
         App::new()
             .app_data(state.clone())
@@ -213,7 +275,7 @@ async fn main() -> anyhow::Result<()> {
                 actix_web::middleware::DefaultHeaders::default()
                     .add(("Content-Type", "application/json")),
             )
-            .app_data(json_config.clone())
+            .app_data(get_json_config())
             .service(get_v1_documentation)
             .service(get_v1_communication_layer)
             .service(post_v1_process)

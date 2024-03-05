@@ -1,0 +1,98 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"type": "shell",
+			"command": "bacon",
+			"problemMatcher": [
+				"$rustc"
+			],
+			"label": "bacon",
+			"options": {
+				"env": {
+					"LIBTORCH_BYPASS_VERSION_CHECK": "1",
+					"LIBTORCH": "/usr/share/libtorch-2.1.1",
+					"LD_LIBRARY_PATH": "/usr/share/libtorch-2.1.1/lib",
+				}
+			}
+		},
+		{
+			"type": "cargo",
+			"command": "build",
+			"args": [
+				"--release"
+			],
+			"problemMatcher": [
+				"$rustc"
+			],
+			"group": {
+				"kind": "build",
+			},
+			"label": "rust: cargo build",
+			"options": {
+				"env": {
+					"LIBTORCH_BYPASS_VERSION_CHECK": "1",
+					"LIBTORCH": "/usr/share/libtorch-2.1.1",
+					"LD_LIBRARY_PATH": "/usr/share/libtorch-2.1.1/lib",
+				}
+			}
+		},
+		{
+			"type": "cargo",
+			"command": "run",
+			"args": [
+				// "--release"
+			],
+			"problemMatcher": [
+				"$rustc"
+			],
+			"label": "rust: cargo run",
+			"group": {
+				"kind": "build",
+				"isDefault": true
+			},
+			"options": {
+				"env": {
+					"RUST_BACKTRACE": "1",
+					"RUST_LOG": "debug",
+					"LIBTORCH_BYPASS_VERSION_CHECK": "1",
+					"LIBTORCH": "/usr/share/libtorch-2.1.1",
+					"LD_LIBRARY_PATH": "/usr/share/libtorch-2.1.1/lib",
+				}
+			}
+		},
+		{
+			"type": "shell",
+			"command": "rust-parallel",
+			"args": [
+				"--exit-on-error",
+				"-p",
+				"-j", "1",
+				"curl",
+				"-X", "POST", 
+				"localhost:9714/v1/process",
+				"-H", "'Content-Type: application/json'",
+				"-H", "'accept: application/json'",
+				"-o", "/tmp/test_curl.json",
+				"-T", // path of test files will be added here
+				":::", "data/test_example*.json", "data/test_split*.json"
+			],
+			"problemMatcher": [
+				"$rustc"
+			],
+			"label": "curl: test all",
+			"group": {
+				"kind": "test",
+				"isDefault": true
+			},
+			// "options": {
+			// 	"env": {
+			// 		"RUST_BACKTRACE": "1",
+			// 		"RUST_LOG": "debug",
+			// 		"LIBTORCH": "/usr/share/libtorch-2.1.1",
+			// 		"LD_LIBRARY_PATH": "/usr/share/libtorch-2.1.1/lib",
+			// 	}
+			// }
+		}
+	]
+}
