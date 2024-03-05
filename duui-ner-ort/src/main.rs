@@ -88,7 +88,7 @@ async fn post_v1_process(
                 .collect::<Vec<TextImagerPrediction>>()
         })
         .collect();
-    HttpResponse::Ok().json(TextImagerResponse::new(predictions))
+    HttpResponse::Ok().json(TextImagerResponse::new(predictions, None))
 }
 
 #[allow(clippy::upper_case_acronyms)]
@@ -137,6 +137,20 @@ struct Args {
 
     // #[arg(short, long, default_value = "model/vocab.json")]
     // vocab_path: String,
+}
+
+fn get_json_config() -> web::JsonConfig {
+    // Configure server to accept all requests as JSON
+    // regardless of set Content-Type and enable large request bodies
+    let accept_all = |_| true;
+    let limit: usize = std::env::var("MAX_PAYLOAD_SIZE")
+        .unwrap_or_else(|_| "16777215".to_string())
+        .parse()
+        .unwrap_or(16_777_215);
+    web::JsonConfig::default()
+        .content_type_required(false)
+        .content_type(accept_all)
+        .limit(limit)
 }
 
 struct AppState {
@@ -189,13 +203,7 @@ async fn main() -> anyhow::Result<()> {
         batch_size: args.batch_size,
     }));
 
-    // Configure server to accept all requests as JSON
-    // regardless of set Content-Type and enable large request bodies
-    let accept_all = |_| true;
-    let json_config = web::JsonConfig::default()
-        .content_type_required(false)
-        .content_type(accept_all)
-        .limit(args.limit);
+    let json_config = get_json_config();
 
     HttpServer::new(move || {
         App::new()
@@ -220,4 +228,84 @@ async fn main() -> anyhow::Result<()> {
     .run()
     .await
     .map_err(anyhow::Error::from)
+}
+
+#[cfg(test)]
+mod test {
+    use actix_web::test;
+
+    use super::*;
+
+    const TEXT: &str = "Barack Obama ist ein US-amerikanischer Politiker der Demokratischen Partei. Er war von 2009 bis 2017 der 44. Präsident der Vereinigten Staaten.";
+
+    const SENTENCE_OFFSETS: [SentenceOffsets; 2] = [
+        SentenceOffsets { begin: 0, end: 74 },
+        SentenceOffsets {
+            begin: 76,
+            end: 143,
+        },
+    ];
+
+    #[actix_web::test]
+    async fn test_app() -> anyhow::Result<()> {
+        let model = spawn_blocking(move || {
+            NERModel::new(TokenClassificationConfig {
+                model_type: rust_bert::pipelines::common::ModelType::XLMRoberta,
+                model_resource: ModelResource::Torch(Box::new(RemoteResource::from_pretrained(
+                    RobertaModelResources::XLM_ROBERTA_NER_DE,
+                ))),
+                config_resource: Box::new(RemoteResource::from_pretrained(
+                    RobertaConfigResources::XLM_ROBERTA_NER_DE,
+                )),
+                vocab_resource: Box::new(RemoteResource::from_pretrained(
+                    RobertaVocabResources::XLM_ROBERTA_NER_DE,
+                )),
+                batch_size: 4,
+                ..Default::default()
+            })
+            .unwrap()
+        })
+        .await?;
+        let state = web::Data::new(Arc::new(AppState {
+            model: Mutex::new(model),
+            batch_size: 4,
+        }));
+        let json_config = get_json_config();
+        let app = test::init_service(
+            App::new()
+                .app_data(state.clone())
+                .wrap(actix_web::middleware::Logger::default())
+                .wrap(
+                    actix_web::middleware::DefaultHeaders::default()
+                        .add(("Content-Type", "application/json")),
+                )
+                .app_data(json_config.clone())
+                .service(get_v1_documentation)
+                .service(get_v1_communication_layer)
+                .service(post_v1_process),
+        )
+        .await;
+
+        let request = test::TestRequest::post()
+            .uri("/v1/process")
+            .set_json(&TextImagerRequest {
+                text: TEXT.into(),
+                language: "de".into(),
+                sentences: SENTENCE_OFFSETS.into_iter().collect(),
+            })
+            .to_request();
+
+        let result: TextImagerResponse = test::call_and_read_body_json(&app, request).await;
+
+        assert_eq!(
+            vec![
+                TextImagerPrediction::new("PER", 0, 12,),
+                TextImagerPrediction::new("MISC", 21, 38,),
+                TextImagerPrediction::new("ORG", 53, 74,),
+                TextImagerPrediction::new("LOC", 123, 142,)
+            ],
+            result.predictions
+        );
+        Ok(())
+    }
 }

@@ -1,7 +1,4 @@
-use std::{
-    collections::HashMap,
-    env,
-};
+use std::{collections::HashMap, env};
 
 use rust_bert::pipelines::ner::Entity;
 use serde::{Deserialize, Serialize};
@@ -66,9 +63,9 @@ impl Default for TextImagerDocumentation {
 
 #[derive(Debug, Serialize, Deserialize, ToSchema)]
 pub struct TextImagerRequest {
-    text: String,
-    language: String,
-    sentences: Vec<SentenceOffsets>,
+    pub text: String,
+    pub language: String,
+    pub sentences: Vec<SentenceOffsets>,
 }
 
 impl TextImagerRequest {
@@ -96,21 +93,29 @@ fn slice_vec_char_as_str<'a>(text: &'a [char], begin: usize, end: usize) -> Stri
 
 #[derive(Debug, Serialize, Deserialize, ToSchema)]
 pub struct SentenceOffsets {
-    begin: usize,
-    end: usize,
+    pub begin: usize,
+    pub end: usize,
 }
 
-#[derive(Debug, Serialize, Deserialize, ToSchema)]
+#[derive(Debug, PartialEq, Serialize, Deserialize, ToSchema)]
 pub struct TextImagerPrediction {
     pub label: String,
     pub begin: usize,
     pub end: usize,
-
-    #[cfg(debug_assertions)]
-    pub text: String,
 }
 
 impl TextImagerPrediction {
+    pub fn new<T>(label: T, begin: usize, end: usize) -> Self
+    where
+        T: Into<String>,
+    {
+        Self {
+            label: label.into(),
+            begin,
+            end,
+        }
+    }
+
     pub fn with_offset(mut self, offset: usize) -> Self {
         self.begin += offset;
         self.end += offset;
@@ -130,27 +135,21 @@ impl From<Entity> for TextImagerPrediction {
             begin += word_len - stripped_word_len;
         }
 
-        Self {
-            label: entity.label,
-            begin,
-            end,
-            #[cfg(debug_assertions)]
-            text: word.trim_start().to_string(),
-        }
+        Self::new(entity.label, begin, end)
     }
 }
 
-#[derive(Debug, Serialize, Deserialize, Default, ToSchema)]
+#[derive(Debug, PartialEq, Serialize, Deserialize, Default, ToSchema)]
 pub struct TextImagerResponse {
     pub predictions: Vec<TextImagerPrediction>,
     pub meta: Option<HashMap<String, String>>,
 }
 
 impl TextImagerResponse {
-    pub fn new(predictions: Vec<TextImagerPrediction>) -> Self {
-        Self {
-            predictions,
-            meta: None,
-        }
+    pub fn new(
+        predictions: Vec<TextImagerPrediction>,
+        meta: Option<HashMap<String, String>>,
+    ) -> Self {
+        Self { predictions, meta }
     }
 }
