@@ -65,7 +65,7 @@ async fn post_v1_process(
     request: web::Json<TextImagerRequest>,
     state: web::Data<Arc<AppState>>,
 ) -> HttpResponse {
-    let (sentences, offsets): (Vec<&str>, Vec<usize>) = request.sentences_and_offsets();
+    let (sentences, offsets): (Vec<String>, Vec<usize>) = request.sentences_and_offsets();
 
     let state_ref = state.get_ref();
     let sentence_batches = sentences.chunks(state_ref.batch_size).collect::<Vec<_>>();
@@ -107,7 +107,7 @@ struct Args {
     #[arg(short, long, default_value_t = 9714)]
     port: u16,
 
-    #[arg(short, long, default_value_t = 4)]
+    #[arg(short, long, default_value_t = 1)]
     workers: usize,
 
     #[arg(short, long, default_value = "cuda")]
@@ -123,11 +123,11 @@ struct Args {
         short,
         long,
         default_value_t = 128,
-        help = "The batch size for processing"
+        help = "The batch size for the rust_bert::NERModel"
     )]
     batch_size: usize,
 
-    #[arg(long, default_value_t = 16_777_216, help = "The request size limit")]
+    #[arg(long, default_value_t = 16_777_215, help = "The request size limit")]
     limit: usize,
     // #[arg(short, long, default_value = "model/rust_model.ot")]
     // model_path: String,
@@ -164,8 +164,9 @@ async fn main() -> anyhow::Result<()> {
     let openapi = ApiDoc::openapi();
 
     let args: Args = Args::parse();
+    dbg!(&args);
 
-    let model = spawn_blocking(|| {
+    let model = spawn_blocking(move || {
         NERModel::new(TokenClassificationConfig {
             model_type: rust_bert::pipelines::common::ModelType::XLMRoberta,
             model_resource: ModelResource::Torch(Box::new(RemoteResource::from_pretrained(
@@ -177,6 +178,7 @@ async fn main() -> anyhow::Result<()> {
             vocab_resource: Box::new(RemoteResource::from_pretrained(
                 RobertaVocabResources::XLM_ROBERTA_NER_DE,
             )),
+            batch_size: args.batch_size,
             ..Default::default()
         })
         .unwrap()

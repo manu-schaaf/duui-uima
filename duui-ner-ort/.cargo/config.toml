@@ -1,3 +1,4 @@
 [env]
-LIBTORCH = "/usr/share/libtorch-2.2.0"
-LD_LIBRARY_PATH = "/usr/share/libtorch-2.2.0/lib"
+LIBTORCH_BYPASS_VERSION_CHECK = "1"
+LIBTORCH = "/usr/share/libtorch-2.1.1"
+LD_LIBRARY_PATH = "/usr/share/libtorch-2.1.1/lib"

@@ -1,4 +1,7 @@
-use std::{collections::HashMap, env};
+use std::{
+    collections::HashMap,
+    env,
+};
 
 use rust_bert::pipelines::ner::Entity;
 use serde::{Deserialize, Serialize};
@@ -69,16 +72,26 @@ pub struct TextImagerRequest {
 }
 
 impl TextImagerRequest {
-    pub fn sentences_and_offsets<'a>(&'a self) -> (Vec<&'a str>, Vec<usize>) {
+    pub fn sentences_and_offsets<'a>(&'a self) -> (Vec<String>, Vec<usize>) {
         self.sentences_with_offsets().unzip()
     }
 
     #[inline(always)]
-    pub(crate) fn sentences_with_offsets<'a>(&'a self) -> impl Iterator<Item = (&'a str, usize)> {
-        self.sentences
-            .iter()
-            .map(|sentence| (&self.text[sentence.begin..=sentence.end], sentence.begin))
+    pub(crate) fn sentences_with_offsets<'a>(
+        &'a self,
+    ) -> impl Iterator<Item = (String, usize)> + 'a {
+        let text = self.text.chars().collect::<Vec<char>>();
+        self.sentences.iter().map(move |sentence| {
+            (
+                slice_vec_char_as_str(&text, sentence.begin, sentence.end),
+                sentence.begin,
+            )
+        })
     }
+}
+
+fn slice_vec_char_as_str<'a>(text: &'a [char], begin: usize, end: usize) -> String {
+    text[begin..end].iter().collect::<String>()
 }
 
 #[derive(Debug, Serialize, Deserialize, ToSchema)]
@@ -92,6 +105,9 @@ pub struct TextImagerPrediction {
     pub label: String,
     pub begin: usize,
     pub end: usize,
+
+    #[cfg(debug_assertions)]
+    pub text: String,
 }
 
 impl TextImagerPrediction {
@@ -118,6 +134,8 @@ impl From<Entity> for TextImagerPrediction {
             label: entity.label,
             begin,
             end,
+            #[cfg(debug_assertions)]
+            text: word.trim_start().to_string(),
         }
     }
 }
