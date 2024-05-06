@@ -1,0 +1,11 @@
+{
+    "models": [
+        {
+            "model": "tinyllama-1.1b-chat-v1.0.Q2_K.gguf",
+            "hf_model_repo_id": "TheBloke/TinyLlama-1.1B-Chat-v1.0-GGUF",
+            "model_alias": "tinyllama-1.1b",
+            "n_gpu_layers": -1,
+            "offload_kqv": true
+        }
+    ]
+}

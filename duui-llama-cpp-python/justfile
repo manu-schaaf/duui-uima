@@ -1,0 +1,49 @@
+export VERSION := "0.1.0"
+
+build-base version=VERSION:
+    docker build -t "docker.texttechnologylab.org/llm/llama-cpp-python/base:{{version}}" -f src/main/docker/Dockerfile.base .
+
+tag-base version=VERSION as="latest":
+    docker image tag "docker.texttechnologylab.org/llm/llama-cpp-python/base:{{version}}" "docker.texttechnologylab.org/llm/llama-cpp-python/base:{{as}}"
+
+push-base version=VERSION:
+    docker push "docker.texttechnologylab.org/llm/llama-cpp-python/base:{{version}}"
+
+build version=VERSION:
+    docker build --build-arg VERSION="{{version}}" -t "docker.texttechnologylab.org/llm/llama-cpp-python:{{version}}" -f src/main/docker/Dockerfile .
+
+tag version=VERSION as="latest":
+    docker image tag "docker.texttechnologylab.org/llm/llama-cpp-python:{{version}}" "docker.texttechnologylab.org/llm/llama-cpp-python:{{as}}"
+
+run version=VERSION:
+    docker run --rm -it -p 9714:9714 "docker.texttechnologylab.org/llm/llama-cpp-python:{{version}}"
+
+push version=VERSION:
+    docker push "docker.texttechnologylab.org/llm/llama-cpp-python:{{version}}"
+
+build-variant variant version=VERSION:
+    docker build --arg VERSION="{{version}}" -t "docker.texttechnologylab.org/llm/llama-cpp-python/{{ file_stem(variant) }}:{{version}}" src/variants/{{ file_stem(variant) }}/
+
+build-variants version=VERSION:
+    #!/bin/bash
+    for variant in src/variants/*; do \
+        @just build-variant "$variant" {{version}}; \
+    done
+
+tag-variant variant version=VERSION as="latest":
+    docker image tag "docker.texttechnologylab.org/llm/llama-cpp-python/{{ file_stem(variant) }}:{{version}}" "docker.texttechnologylab.org/llm/llama-cpp-python/{{ file_stem(variant) }}:{{as}}"; \
+
+tag-variants version=VERSION as="latest":
+    #!/bin/bash
+    for variant in src/variants/*; do \
+        @just tag-variant "$variant" {{version}} {{as}}; \
+    done
+
+push-variant variant version=VERSION:
+    docker push "docker.texttechnologylab.org/llm/llama-cpp-python/{{ file_stem(variant) }}:{{version}}"
+
+push-variants version=VERSION:
+    #!/bin/bash
+    for variant in src/variants/*; do \
+        @just push-variant "$variant" {{version}}; \
+    done
