@@ -5,7 +5,8 @@
             "model": "mixtral-8x7b-instruct-v0.1.Q5_K_M.gguf",
             "model_alias": "mixtral-8x7b",
             "chat_format": "mistral-instruct",
-            "n_ctx": 32768
+            "n_gpu_layers": -1,
+            "n_ctx": 8192
         }
     ]
 }

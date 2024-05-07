@@ -1,4 +1,18 @@
-export VERSION := "0.1.0"
+export VERSION := "0.2.0"
+
+default version=VERSION:
+    # @just build-base {{version}}
+    # @just tag-base {{version}} latest
+    # @just build {{version}}
+    # @just tag {{version}} latest
+    # @just build-variants {{version}}
+    # @just tag-variants {{version}} latest
+    @just push-base latest
+    @just push-base {{version}}
+    @just push latest
+    @just push {{version}}
+    @just push-variants latest
+    @just push-variants {{version}}
 
 build-base version=VERSION:
     docker build -t "docker.texttechnologylab.org/llm/llama-cpp-python/base:{{version}}" -f src/main/docker/Dockerfile.base .
@@ -22,28 +36,39 @@ push version=VERSION:
     docker push "docker.texttechnologylab.org/llm/llama-cpp-python:{{version}}"
 
 build-variant variant version=VERSION:
-    docker build --arg VERSION="{{version}}" -t "docker.texttechnologylab.org/llm/llama-cpp-python/{{ file_stem(variant) }}:{{version}}" src/variants/{{ file_stem(variant) }}/
+    docker build --build-arg VERSION="{{version}}" -t "docker.texttechnologylab.org/llm/llama-cpp-python/{{ file_name(variant) }}:{{version}}" src/variants/{{ file_name(variant) }}/
+
+alias variant := build-variant
 
 build-variants version=VERSION:
     #!/bin/bash
     for variant in src/variants/*; do \
-        @just build-variant "$variant" {{version}}; \
+        just build-variant "$variant" {{version}}; \
     done
 
 tag-variant variant version=VERSION as="latest":
-    docker image tag "docker.texttechnologylab.org/llm/llama-cpp-python/{{ file_stem(variant) }}:{{version}}" "docker.texttechnologylab.org/llm/llama-cpp-python/{{ file_stem(variant) }}:{{as}}"; \
+    docker image tag "docker.texttechnologylab.org/llm/llama-cpp-python/{{ file_name(variant) }}:{{version}}" "docker.texttechnologylab.org/llm/llama-cpp-python/{{ file_name(variant) }}:{{as}}"; \
 
 tag-variants version=VERSION as="latest":
     #!/bin/bash
     for variant in src/variants/*; do \
-        @just tag-variant "$variant" {{version}} {{as}}; \
+        just tag-variant "$variant" {{version}} {{as}}; \
     done
 
 push-variant variant version=VERSION:
-    docker push "docker.texttechnologylab.org/llm/llama-cpp-python/{{ file_stem(variant) }}:{{version}}"
+    docker push "docker.texttechnologylab.org/llm/llama-cpp-python/{{ file_name(variant) }}:{{version}}"
 
 push-variants version=VERSION:
     #!/bin/bash
     for variant in src/variants/*; do \
-        @just push-variant "$variant" {{version}}; \
+        just push-variant "$variant" {{version}}; \
     done
+
+build-example version=VERSION:
+    @just build-variant tinyllama-1.1b {{version}}
+
+tag-example version=VERSION as="latest":
+    @just tag-variant tinyllama-1.1b {{version}} {{as}}
+
+push-example version=VERSION:
+    @just push-variant tinyllama-1.1b {{version}}

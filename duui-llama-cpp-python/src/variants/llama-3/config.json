@@ -5,6 +5,7 @@
             "hf_model_repo_id": "NousResearch/Meta-Llama-3-8B-Instruct-GGUF",
             "model_alias": "Llama-3-8b",
             "chat_format": "llama-3",
+            "n_gpu_layers": -1,
             "n_ctx": 8192
         }
     ]
