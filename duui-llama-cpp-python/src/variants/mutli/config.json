@@ -1,0 +1,22 @@
+{
+  "models": [
+    {
+      "model": "Meta-Llama-3-8B-Instruct-Q5_K_M.gguf",
+      "hf_model_repo_id": "NousResearch/Meta-Llama-3-8B-Instruct-GGUF",
+      "model_alias": "llama-3-8b",
+      "chat_format": "llama-3",
+      "n_gpu_layers": -1,
+      "tensor_split": [0.8, 0.2],
+      "n_ctx": 8192
+    },
+    {
+      "model": "mixtral-8x7b-instruct-v0.1.Q5_K_M.gguf",
+      "hf_model_repo_id": "TheBloke/Mixtral-8x7B-Instruct-v0.1-GGUF",
+      "model_alias": "mixtral-8x7b",
+      "chat_format": "mistral-instruct",
+      "n_gpu_layers": -1,
+      "tensor_split": [0.9, 0.1],
+      "n_ctx": 8192
+    }
+  ]
+}
