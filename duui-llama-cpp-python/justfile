@@ -1,74 +1,111 @@
-export VERSION := "0.2.0"
+export VERSION := "0.3.0"
+export CUDA_VERSION := "12.4.1"
+export CUDA_IMAGE := "12.4.1-cudnn-devel-ubuntu22.04"
+export LLAMA_VERSION := "0.2.69"
 
-default version=VERSION:
-    # @just build-base {{version}}
-    # @just tag-base {{version}} latest
-    # @just build {{version}}
-    # @just tag {{version}} latest
-    # @just build-variants {{version}}
-    # @just tag-variants {{version}} latest
-    @just push-base latest
-    @just push-base {{version}}
-    @just push latest
-    @just push {{version}}
-    @just push-variants latest
-    @just push-variants {{version}}
+default version=VERSION cuda=CUDA_IMAGE llama=LLAMA_VERSION:
+    @just hf
+    @just deps {{cuda}} {{llama}}
+    @just base {{version}}
+    @just variants {{version}}
 
-build-base version=VERSION:
-    docker build -t "docker.texttechnologylab.org/llm/llama-cpp-python/base:{{version}}" -f src/main/docker/Dockerfile.base .
+
+hf version="latest":
+    docker build -t "docker.texttechnologylab.org/llm/hf:{{version}}" -f src/main/docker/Dockerfile.hf .
+    docker tag "docker.texttechnologylab.org/llm/hf:{{version}}" "docker.texttechnologylab.org/llm/hf:latest"
+    docker push "docker.texttechnologylab.org/llm/hf:{{version}}"
+    docker push "docker.texttechnologylab.org/llm/hf:latest"
+
+
+build-deps cuda=CUDA_IMAGE llama=LLAMA_VERSION:
+    docker build --build-arg CUDA_IMAGE="{{cuda}}" -t "docker.texttechnologylab.org/llm/llama-cpp-python/deps:{{ replace_regex(cuda, '-.*', '') }}-{{llama}}" -f src/main/docker/Dockerfile.deps .
+
+tag-deps cuda=CUDA_IMAGE llama=LLAMA_VERSION as="latest":
+    docker image tag "docker.texttechnologylab.org/llm/llama-cpp-python/deps:{{ replace_regex(cuda, '-.*', '') }}-{{llama}}" "docker.texttechnologylab.org/llm/llama-cpp-python/deps:{{as}}"
+
+push-deps +tags="latest":
+    for tag in {{tags}}; do \
+        docker push "docker.texttechnologylab.org/llm/llama-cpp-python/deps:${tag}"; \
+    done
+
+deps cuda=CUDA_IMAGE llama=LLAMA_VERSION:
+    @just build-deps {{cuda}} {{llama}}
+    @just tag-deps {{cuda}} {{llama}}
+    @just push-deps "{{ replace_regex(cuda, '-.*', '') }}-{{llama}}" "latest"
+
+
+build-base version=VERSION tag=VERSION:
+    docker build --build-arg VERSION="{{version}}" -t "docker.texttechnologylab.org/llm/llama-cpp-python/base:{{tag}}" -f src/main/docker/Dockerfile.base .
 
 tag-base version=VERSION as="latest":
     docker image tag "docker.texttechnologylab.org/llm/llama-cpp-python/base:{{version}}" "docker.texttechnologylab.org/llm/llama-cpp-python/base:{{as}}"
 
-push-base version=VERSION:
-    docker push "docker.texttechnologylab.org/llm/llama-cpp-python/base:{{version}}"
-
-build version=VERSION:
-    docker build --build-arg VERSION="{{version}}" -t "docker.texttechnologylab.org/llm/llama-cpp-python:{{version}}" -f src/main/docker/Dockerfile .
-
-tag version=VERSION as="latest":
-    docker image tag "docker.texttechnologylab.org/llm/llama-cpp-python:{{version}}" "docker.texttechnologylab.org/llm/llama-cpp-python:{{as}}"
-
-run version=VERSION:
-    docker run --rm -it -p 9714:9714 "docker.texttechnologylab.org/llm/llama-cpp-python:{{version}}"
-
-push version=VERSION:
-    docker push "docker.texttechnologylab.org/llm/llama-cpp-python:{{version}}"
-
-build-variant variant version=VERSION:
-    docker build --build-arg VERSION="{{version}}" -t "docker.texttechnologylab.org/llm/llama-cpp-python/{{ file_name(variant) }}:{{version}}" src/variants/{{ file_name(variant) }}/
-
-alias variant := build-variant
-
-build-variants version=VERSION:
-    #!/bin/bash
-    for variant in src/variants/*; do \
-        just build-variant "$variant" {{version}}; \
+push-base +versions=VERSION:
+    for version in {{versions}}; do \
+        docker push "docker.texttechnologylab.org/llm/llama-cpp-python/base:${version}"; \
     done
 
-tag-variant variant version=VERSION as="latest":
-    docker image tag "docker.texttechnologylab.org/llm/llama-cpp-python/{{ file_name(variant) }}:{{version}}" "docker.texttechnologylab.org/llm/llama-cpp-python/{{ file_name(variant) }}:{{as}}"; \
+run-base version=VERSION:
+    docker run --rm -it -p 9714:9714 "docker.texttechnologylab.org/llm/llama-cpp-python/base:{{version}}"
 
-tag-variants version=VERSION as="latest":
+base version=VERSION:
+    @just build-base {{version}}
+    @just tag-base {{version}} latest
+    @just push-base {{version}} latest
+
+
+build-example base=VERSION tag=VERSION:
+    @just build-variant tinyllama-1.1b {{base}} {{tag}}
+
+tag-example tag=VERSION as="latest":
+    @just tag-variant tinyllama-1.1b {{tag}} {{as}}
+
+push-example tag=VERSION:
+    @just push-variant tinyllama-1.1b {{tag}}
+
+example base=VERSION tag=VERSION:
+    @just build-example {{base}} {{tag}}
+    @just tag-example {{tag}} latest
+    @just push-example {{tag}}
+    @just push-example latest
+
+
+build-variant variant base=VERSION tag=VERSION:
+    docker build --build-arg VERSION="{{base}}" -t "docker.texttechnologylab.org/llm/llama-cpp-python/{{ file_name(variant) }}:{{tag}}" src/variants/{{ file_name(variant) }}/
+
+tag-variant variant tag=VERSION as="latest":
+    docker image tag "docker.texttechnologylab.org/llm/llama-cpp-python/{{ file_name(variant) }}:{{tag}}" "docker.texttechnologylab.org/llm/llama-cpp-python/{{ file_name(variant) }}:{{as}}"
+
+push-variant variant tag=VERSION:
+    docker push "docker.texttechnologylab.org/llm/llama-cpp-python/{{ file_name(variant) }}:{{tag}}"
+
+variant name base=VERSION tag=VERSION:
+    @just build-variant {{name}} {{base}} {{tag}}
+    @just tag-variant {{name}} {{tag}} latest
+    @just push-variant {{name}} {{tag}}
+    @just push-variant {{name}} latest
+
+
+build-variants base=VERSION tag=VERSION:
     #!/bin/bash
     for variant in src/variants/*; do \
-        just tag-variant "$variant" {{version}} {{as}}; \
+        just build-variant "$variant" {{base}} {{tag}}; \
     done
 
-push-variant variant version=VERSION:
-    docker push "docker.texttechnologylab.org/llm/llama-cpp-python/{{ file_name(variant) }}:{{version}}"
-
-push-variants version=VERSION:
+tag-variants tag=VERSION as="latest":
     #!/bin/bash
     for variant in src/variants/*; do \
-        just push-variant "$variant" {{version}}; \
+        just tag-variant "$variant" {{tag}} {{as}}; \
     done
 
-build-example version=VERSION:
-    @just build-variant tinyllama-1.1b {{version}}
+push-variants tag=VERSION:
+    #!/bin/bash
+    for variant in src/variants/*; do \
+        just push-variant "$variant" {{tag}}; \
+    done
 
-tag-example version=VERSION as="latest":
-    @just tag-variant tinyllama-1.1b {{version}} {{as}}
-
-push-example version=VERSION:
-    @just push-variant tinyllama-1.1b {{version}}
+variants base=VERSION tag=VERSION:
+    @just build-variants {{base}} {{tag}}
+    @just tag-variants {{tag}} latest
+    @just push-variants {{tag}}
+    @just push-variants latest
