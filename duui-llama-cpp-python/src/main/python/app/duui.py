@@ -3,10 +3,11 @@ import os
 import sys
 import traceback
 from pathlib import Path
-from typing import Literal, Optional
 
 import llama_cpp
-from app.task import TaskSpecificRequestBody, TaskSpecificResponse, task_specific_logic
+from app.model import DUUICapability, DUUIDocumentation, ErrorMessage
+from app.task.model import LlamaRequest, TaskSpecificResponse
+from app.task.process import task_specific_process
 from fastapi import APIRouter, Depends, Request, Response
 from fastapi.responses import JSONResponse, PlainTextResponse
 from llama_cpp.server.app import (
@@ -21,75 +22,47 @@ from llama_cpp.server.types import (
     CreateCompletionRequest,
     CreateEmbeddingRequest,
 )
-from pydantic import BaseModel
+
+# Import all from task, enables developers to override base classes
+try:
+    from app.task import *
+except ImportError:
+    pass
 
 v1_api = APIRouter()
 
 logger = logging.getLogger("fastapi")
 
 
+lua_communication_layer = ""
 if (path := Path("lua_communication_layer.lua")).exists():
     logger.debug("Loading Lua communication layer from file")
     with path.open("r", encoding="utf-8") as f:
-        lua_communication_script = f.read()
+        lua_communication_layer = f.read()
 else:
-    pass
-    # raise RuntimeError("Lua communication layer not found!")
+    logger.warning("Lua communication layer not found")
 
 
-@v1_api.get("/v1/communication_layer", response_class=PlainTextResponse)
+@v1_api.get("/v1/communication_layer", response_class=PlainTextResponse, tags=["DUUI"])
 def get_communication_layer() -> str:
     """Get the LUA communication script"""
-    return lua_communication_script
+    return lua_communication_layer
 
 
 type_system = ""
-if (path := Path("dkpro-core-types.xml")).exists():
+if (path := Path("typesystem.xml")).exists():
     logger.debug("Loading type system from file")
     with path.open("r", encoding="utf-8") as f:
         type_system = f.read()
 
 
-@v1_api.get("/v1/typesystem")
+@v1_api.get("/v1/typesystem", tags=["DUUI"])
 def get_typesystem() -> Response:
     """Get typesystem of this annotator"""
     return Response(content=type_system, media_type="application/xml")
 
 
-class DUUICapability(BaseModel):
-    """Capability response model"""
-
-    # List of supported languages by the annotator
-    # TODO how to handle language?
-    # - ISO 639-1 (two letter codes) as default in meta data
-    # - ISO 639-3 (three letters) optionally in extra meta to allow a finer mapping
-    supported_languages: list[str]
-    # Are results on same inputs reproducible without side effects?
-    reproducible: bool
-
-
-class DUUIDocumentation(BaseModel):
-    """Documentation response model"""
-
-    # Name of this annotator
-    annotator_name: str
-    # Version of this annotator
-    version: str
-    # Annotator implementation language (Python, Java, ...)
-    implementation_lang: Optional[str]
-    # Optional map of additional meta data
-    meta: Optional[dict]
-    # Docker container id, if any
-    docker_container_id: Optional[str]
-    # Optional map of supported parameters
-    parameters: Optional[dict]
-    # Capabilities of this annotator
-    capability: DUUICapability
-    # Analysis engine XML, if available
-    implementation_specific: Optional[str]
-
-
-@v1_api.get("/v1/documentation")
+@v1_api.get("/v1/documentation", tags=["DUUI"])
 def get_documentation() -> DUUIDocumentation:
     """Get documentation info"""
     capabilities = DUUICapability(
@@ -114,72 +87,50 @@ def get_documentation() -> DUUIDocumentation:
     return documentation
 
 
-class LlamaRequestBody(BaseModel):
-    """Request model"""
-
-    type: Literal["chat", "completion", "embedding", "task"] = "chat"
-    body: dict
-
-
-class ErrorMessage(BaseModel):
-    message: str
-    traceback: Optional[list[str]]
-
-
-class DUUIResponse(BaseModel):
-    llama_response: (
+@v1_api.post(
+    "/v1/process",
+    response_model=(
         TaskSpecificResponse
         | llama_cpp.CreateChatCompletionResponse
         | llama_cpp.CreateCompletionResponse
         | llama_cpp.CreateEmbeddingResponse
-    )
-
-
-@v1_api.post(
-    "/v1/process",
-    response_model=DUUIResponse,
+    ),
     responses={
         400: {
             "model": ErrorMessage,
-            "description": "There was an error with the request",
+            "description": "An error occurred while processing the request.",
         },
     },
+    tags=["DUUI"],
 )
 async def v1_process(
     request: Request,
-    llama_request: LlamaRequestBody,
+    llama_request: LlamaRequest,
     llama_proxy: LlamaProxy = Depends(get_llama_proxy),
 ):
     try:
         match llama_request.type:
             case "chat":
-                response = await create_chat_completion(
+                return await create_chat_completion(
                     request=request,
                     body=CreateChatCompletionRequest(**llama_request.body),
                     llama_proxy=llama_proxy,
                 )
-            case "completion":
-                response = await create_completion(
+            case "completion" | "completions":
+                return await create_completion(
                     request=request,
                     body=CreateCompletionRequest(**llama_request.body),
                     llama_proxy=llama_proxy,
                 )
             case "embedding":
-                response = await create_embedding(
+                return await create_embedding(
                     request=CreateEmbeddingRequest(**llama_request.body),
                     llama_proxy=llama_proxy,
                 )
-            case "task":
-                response = await task_specific_logic(
-                    body=TaskSpecificRequestBody(**llama_request.body),
-                    llama_proxy=llama_proxy,
-                )
             case _:
-                return JSONResponse(
-                    status_code=400,
-                    content={
-                        "message": f"Invalid request type: '{llama_request.type}'"
-                    },
+                return await task_specific_process(
+                    body=llama_request,
+                    llama_proxy=llama_proxy,
                 )
     except Exception as e:
         logger.error(f"Error in v1_process: {e}\n{traceback.format_exc()}")
@@ -190,6 +141,3 @@ async def v1_process(
                 "traceback": traceback.format_exc().splitlines(),
             },
         )
-    return DUUIResponse(
-        llama_response=response,
-    )

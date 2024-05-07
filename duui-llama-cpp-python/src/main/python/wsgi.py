@@ -18,13 +18,6 @@ def app():
     app.include_router(duui_v1_api)
 
     return app
-    # uvicorn.run(
-    #     app,
-    #     host=os.getenv("HOST", server_settings.host),
-    #     port=int(os.getenv("PORT", server_settings.port)),
-    #     ssl_keyfile=server_settings.ssl_keyfile,
-    #     ssl_certfile=server_settings.ssl_certfile,
-    # )
 
 
 if __name__ == "__main__":
@@ -36,7 +29,3 @@ if __name__ == "__main__":
         ssl_certfile=os.getenv("SSL_CERTFILE", None),
         log_level="info",
     )
-
-
-
-

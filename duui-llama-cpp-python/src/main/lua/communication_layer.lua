@@ -13,15 +13,15 @@ function serialize(inputCas, outputStream, parameters)
     local model = nil
     if parameters then
         model = parameters["model"]
-        -- Encode data as JSON object and write to stream
         outputStream:write(json.encode({
             text = document_text,
             model = model,
+            type = "task",
         }))
     else
-        -- Encode data as JSON object and write to stream
         outputStream:write(json.encode({
             text = document_text,
+            type = "task",
         }))
     end
 end
