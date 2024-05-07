@@ -1,13 +1,14 @@
 version: '3'
 services:
   llama_cpp_python:
-    build: 
+    image: docker.texttechnologylab.org/llm/llama-cpp-python/with-mounts:latest
+    build:
       context: .
       dockerfile: Dockerfile
     ports:
       - 9714:9714
     volumes:
-      - /storage/nlp/model/gguf/:/app/models/
+      - /storage/nlp/models/gguf/:/app/models/
       - /storage/nlp/huggingface/:/root/.cache/huggingface/
     deploy:
       resources:

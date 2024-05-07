@@ -1,10 +1,18 @@
-FROM docker.texttechnologylab.org/llm/hf:latest as fetch
+ARG VERSION="latest"
+FROM docker.texttechnologylab.org/llm/llama-cpp-python/base:${VERSION} as base
 
+FROM docker.texttechnologylab.org/llm/hf:latest as fetch
 RUN huggingface-cli download NousResearch/Meta-Llama-3-8B-Instruct-GGUF Meta-Llama-3-8B-Instruct-Q5_K_M.gguf
 
-FROM docker.texttechnologylab.org/llm/llama-cpp-python/base:latest as component
+FROM docker.texttechnologylab.org/llm/llama-cpp-python/deps:${VERSION} as component
 COPY --from=fetch /root/.cache/huggingface/hub /root/.cache/huggingface/hub
-COPY --from=docker.texttechnologylab.org/llm/llama-cpp-python:latest /app/ /app/
+COPY --from=base /app/ /app/
+
+ENV HOST 0.0.0.0
+ENV PORT 9714
+ENV SSL_KEYFILE=
+ENV SSL_CERTFILE=
+ENV CONFIG_FILE /app/config.json
 
 WORKDIR /app/
 COPY ./config.json /app/

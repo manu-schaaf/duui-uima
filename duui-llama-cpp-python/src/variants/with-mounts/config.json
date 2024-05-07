@@ -3,20 +3,78 @@
     {
       "model": "Meta-Llama-3-8B-Instruct-Q5_K_M.gguf",
       "hf_model_repo_id": "NousResearch/Meta-Llama-3-8B-Instruct-GGUF",
-      "model_alias": "llama-3-8b",
+      "model_alias": "llama-3-8b-q5km",
       "chat_format": "llama-3",
       "n_gpu_layers": -1,
-      "tensor_split": [0.8, 0.2],
+      "tensor_split": [0.5, 0.5],
+      "n_ctx": 8192
+    },
+    {
+      "model": "/app/models/Meta-Llama-3-70B-Instruct-Q4_K_M.gguf",
+      "model_alias": "llama-3-70b-q4km",
+      "chat_format": "llama-3",
+      "n_gpu_layers": -1,
+      "tensor_split": [0.5, 0.5],
+      "n_ctx": 8192
+    },
+    {
+      "model": "/app/models/Meta-Llama-3-70B-Instruct-Q5_K_M.gguf",
+      "model_alias": "llama-3-70b-q5km",
+      "chat_format": "llama-3",
+      "n_gpu_layers": -1,
+      "tensor_split": [0.5, 0.5],
+      "n_ctx": 8192
+    },
+    {
+      "model": "Llama-3-SauerkrautLM-8b-Instruct-Q5_K_M.gguf",
+      "hf_model_repo_id": "bartowski/Llama-3-SauerkrautLM-8b-Instruct-GGUF",
+      "model_alias": "llama-3-sauerkrautlm-8b-q5km",
+      "chat_format": "llama-3",
+      "n_gpu_layers": -1,
+      "tensor_split": [0.5, 0.5],
       "n_ctx": 8192
     },
     {
       "model": "mixtral-8x7b-instruct-v0.1.Q5_K_M.gguf",
       "hf_model_repo_id": "TheBloke/Mixtral-8x7B-Instruct-v0.1-GGUF",
-      "model_alias": "mixtral-8x7b",
+      "model_alias": "mixtral-8x7b-q5km",
       "chat_format": "mistral-instruct",
       "n_gpu_layers": -1,
-      "tensor_split": [0.9, 0.1],
+      "tensor_split": [0.5, 0.5],
       "n_ctx": 8192
+    },
+    {
+      "model": "sauerkrautlm-mixtral-8x7b-instruct.Q5_K_M.gguf",
+      "hf_model_repo_id": "TheBloke/SauerkrautLM-Mixtral-8x7B-Instruct-GGUF",
+      "model_alias": "sauerkrautlm-mixtral-8x7b-q5km",
+      "chat_format": "mistral-instruct",
+      "n_gpu_layers": -1,
+      "tensor_split": [0.5, 0.5],
+      "n_ctx": 8192
+    },
+    {
+      "model": "/app/models/llama-2-7b-chat.Q5_K_M.gguf",
+      "model_alias": "llama-2-7b-q5km",
+      "chat_format": "llama-2",
+      "n_gpu_layers": -1,
+      "tensor_split": [0.5, 0.5],
+      "n_ctx": 4096
+    },
+    {
+      "model": "/app/models/llama-2-13b-chat.Q5_K_M.gguf",
+      "model_alias": "llama-2-13b-q5km",
+      "chat_format": "llama-2",
+      "n_gpu_layers": -1,
+      "tensor_split": [0.5, 0.5],
+      "n_ctx": 4096
+    },
+    {
+      "model": "/app/models/llama-2-70b-chat.Q5_K_M.gguf",
+      "model_alias": "llama-2-70b-q5km",
+      "chat_format": "llama-2",
+      "n_gpu_layers": -1,
+      "tensor_split": [0.5, 0.5],
+      "n_ctx": 4096
     }
   ]
 }
