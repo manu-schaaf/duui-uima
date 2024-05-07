@@ -1,8 +1,5 @@
 ARG CUDA_IMAGE="12.4.1-cudnn-devel-ubuntu22.04"
-FROM nvidia/cuda:${CUDA_IMAGE}
-
-# We need to set the host to 0.0.0.0 to allow outside access
-ENV HOST 0.0.0.0
+FROM nvidia/cuda:${CUDA_IMAGE} as cuda
 
 # Install dependencies
 RUN apt-get update \
@@ -24,6 +21,8 @@ RUN apt-get update \
     && mkdir -p /etc/OpenCL/vendors \
     && echo "libnvidia-opencl.so.1" > /etc/OpenCL/vendors/nvidia.icd
 
+FROM cuda as llama_cpp_python
+
 # Setting build related env vars
 ENV CUDA_DOCKER_ARCH=all
 ENV LLAMA_CUDA=1
@@ -31,7 +30,7 @@ ENV LLAMA_CUDA=1
 # Install llama-cpp-python (build with cuda)
 ARG LLAMA_CPP_PYTHON_VERSION="0.2.69"
 RUN python3 -m pip install --no-cache-dir --upgrade pip && \
-    CMAKE_ARGS="-DLLAMA_CUDA=on" pip install --no-cache-dir --upgrade \
+    pip install --no-cache-dir \
     cmake \
     fastapi \
     gunicorn \
@@ -43,7 +42,4 @@ RUN python3 -m pip install --no-cache-dir --upgrade pip && \
     sse-starlette \
     starlette-context \
     uvicorn \
-    llama-cpp-python==${LLAMA_CPP_PYTHON_VERSION}
-
-# Set the LD_LIBRARY_PATH
-ENV LD_LIBRARY_PATH=/usr/local/cuda/compat/:${LD_LIBRARY_PATH}
+    && CMAKE_ARGS="-DLLAMA_CUDA=on" pip install --no-cache-dir llama-cpp-python==${LLAMA_CPP_PYTHON_VERSION}
