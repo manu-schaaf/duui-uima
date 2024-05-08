@@ -1,5 +1,6 @@
-ARG VERSION
-FROM docker.texttechnologylab.org/llm/llama-cpp-python/deps:${VERSION} as setup
+ARG CUDA_VERSION="cu124"
+ARG LLAMA_VERSION="0.2.69"
+FROM docker.texttechnologylab.org/llm/llama-cpp-python/${CUDA_VERSION}/deps:${LLAMA_VERSION} as setup
 
 ENV HOST 0.0.0.0
 ENV PORT 9714

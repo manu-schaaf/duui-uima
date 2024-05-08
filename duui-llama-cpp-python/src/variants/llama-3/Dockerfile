@@ -1,10 +1,12 @@
-ARG VERSION="latest"
-FROM docker.texttechnologylab.org/llm/llama-cpp-python/base:${VERSION} as base
+ARG CUDA_VERSION="cu124"
+ARG BASE_VERSION="latest"
+# base layer for the component
+FROM docker.texttechnologylab.org/llm/llama-cpp-python/${CUDA_VERSION}/base:${BASE_VERSION} as base
 
 FROM docker.texttechnologylab.org/llm/hf:latest as fetch
 RUN huggingface-cli download NousResearch/Meta-Llama-3-8B-Instruct-GGUF Meta-Llama-3-8B-Instruct-Q5_K_M.gguf
 
-FROM docker.texttechnologylab.org/llm/llama-cpp-python/deps:${VERSION} as component
+FROM docker.texttechnologylab.org/llm/llama-cpp-python/${CUDA_VERSION}/deps:${BASE_VERSION} as component
 COPY --from=fetch /root/.cache/huggingface/hub /root/.cache/huggingface/hub
 COPY --from=base /app/ /app/
 
