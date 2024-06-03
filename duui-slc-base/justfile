@@ -1,0 +1,14 @@
+export VERSION := "0.1.0"
+export REPOSITORY := "docker.texttechnologylab.org"
+
+base version=VERSION:
+    docker build \
+        --build-arg CUDA_VERSION="12.4.1" \
+        -t {{REPOSITORY}}/duui-slc-base/cu124:{{version}} \
+        -f ../duui-slc-base/src/main/docker/Dockerfile ../duui-slc-base/src/main/
+
+tag version=VERSION as="latest":
+    docker tag {{REPOSITORY}}/duui-slc-base/cu124:{{version}} {{REPOSITORY}}/duui-slc-base/cu124:latest
+
+push version=VERSION:
+    docker push {{REPOSITORY}}/duui-slc-base/cu124:{{version}}
