@@ -3,7 +3,7 @@ from typing import Literal
 from pydantic import BaseModel
 
 
-class DUUICapability(BaseModel):
+class DuuiCapability(BaseModel):
     """Capability response model"""
 
     # List of supported languages by the annotator
@@ -15,7 +15,7 @@ class DUUICapability(BaseModel):
     reproducible: bool
 
 
-class DUUIDocumentation(BaseModel):
+class DuuiDocumentation(BaseModel):
     """Documentation response model"""
 
     # Name of this annotator
@@ -31,7 +31,7 @@ class DUUIDocumentation(BaseModel):
     # Optional map of supported parameters
     parameters: dict | None
     # Capabilities of this annotator
-    capability: DUUICapability
+    capability: DuuiCapability
     # Analysis engine XML, if available
     implementation_specific: str | None
 
@@ -55,7 +55,7 @@ class ErrorMessage(BaseModel):
     traceback: list[str] | None
 
 
-class SpaCyToken(Offset):
+class UimaToken(Offset):
     pos: str
     tag: str
     lemma: str
@@ -63,14 +63,14 @@ class SpaCyToken(Offset):
     idx: int
 
 
-class SpaCyDependency(Offset):
+class UimaDependency(Offset):
     governor: int
     dependent: int
     type: str
     flavor: str
 
 
-class SpaCyAnnotations(BaseModel):
+class DuuiResponse(BaseModel):
     sentences: list[Offset]
-    tokens: list[SpaCyToken]
-    dependencies: list[SpaCyDependency]
+    tokens: list[UimaToken]
+    dependencies: list[UimaDependency]

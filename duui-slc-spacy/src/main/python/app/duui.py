@@ -2,34 +2,28 @@ import logging
 import os
 import sys
 import traceback
-from threading import Lock
 from pathlib import Path
+from threading import Lock
 
 import spacy
 from app.model import (
-    DUUICapability,
-    DUUIDocumentation,
+    DuuiCapability,
+    DuuiDocumentation,
     DUUIRequest,
+    DuuiResponse,
     ErrorMessage,
     Offset,
-    SpaCyAnnotations,
 )
-from app.process import post_process
+from app.specific import SpecificModelProxy, SpecificPostProcessor
 from fastapi import APIRouter, Depends, Response
 from fastapi.responses import JSONResponse, PlainTextResponse
 
 v1_api = APIRouter()
 
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-)
 logger = logging.getLogger(__name__)
 
 
-lua_path = Path(
-    os.environ.get("COMMUNICATION_LAYER_PATH", "communication_layer.lua")
-)
+lua_path = Path(os.environ.get("COMMUNICATION_LAYER_PATH", "communication_layer.lua"))
 
 if lua_path.exists():
     logger.debug("Loading Lua communication layer from file")
@@ -61,14 +55,14 @@ def get_typesystem() -> Response:
 
 
 @v1_api.get("/v1/documentation", tags=["DUUI"])
-def get_documentation() -> DUUIDocumentation:
+def get_documentation() -> DuuiDocumentation:
     """Get documentation info"""
-    capabilities = DUUICapability(
+    capabilities = DuuiCapability(
         supported_languages=["en", "de"],
         reproducible=True,
     )
 
-    documentation = DUUIDocumentation(
+    documentation = DuuiDocumentation(
         annotator_name="duui-slc-spacy",
         version="0.0.1",
         implementation_lang="Python",
@@ -87,57 +81,20 @@ def get_documentation() -> DUUIDocumentation:
 
 lock = Lock()
 
-# model_en = "en_core_web_trf"
-model_en = "en_core_web_sm"
-# model_de = "de_dep_news_trf"
-model_de = "de_core_news_sm"
-model_map = {
-    "en": model_en,
-    "en_US": model_en,
-    "en_GB": model_en,
-    "en_AU": model_en,
-    "en_CA": model_en,
-    "de": model_de,
-    "de_DE": model_de,
-    "de_AT": model_de,
-    "de_CH": model_de,
-}
-
-
-class SpaCyModelProxy:
-    def __init__(self):
-        self.models = {}
-
-    def __getitem__(self, lang: str):
-        lang = model_map.get(lang.replace("-", "_"), lang)
-        if self.models.get(lang) is None:
-            logger.info(f"load({lang})")
-            nlp = spacy.load(
-                lang,
-                disable=[
-                    "ner",
-                ],
-            )
-            nlp.add_pipe("sentencizer")
-            self.models[lang] = nlp
-            logger.info(f"load({lang}): done")
-        return self.models[lang]
-
-
-_spacy_model_proxy = SpaCyModelProxy()
+_model_proxy = SpecificModelProxy()
 
 
 def get_pipeline():
     lock.acquire()
     try:
-        yield _spacy_model_proxy
+        yield _model_proxy
     finally:
         lock.release()
 
 
 @v1_api.post(
     "/v1/process",
-    response_model=SpaCyAnnotations,
+    response_model=DuuiResponse,
     responses={
         400: {
             "model": ErrorMessage,
@@ -164,7 +121,7 @@ async def v1_process(
             annotations = [nlp(request.text)]
             offsets = [Offset(begin=0, end=0)]
 
-        results = post_process(
+        results = SpecificPostProcessor.process(
             annotations,
             offsets,
         )
