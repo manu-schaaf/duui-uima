@@ -1,6 +1,1 @@
-import logging
-
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-)
+../../../../../base/src/main/python/app/__init__.py
