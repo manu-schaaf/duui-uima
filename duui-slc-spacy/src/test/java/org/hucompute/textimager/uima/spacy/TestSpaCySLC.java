@@ -120,8 +120,8 @@ public class TestSpaCySLC {
         assertArrayEquals(pos, casPos);
 
         String[] posCoarse = new String[] {
-                "DET", "AUX", "DET", "NOUN", "ADP", "PROPN", "PUNCT",
-                "CCONJ", "DET", "AUX", "DET", "PROPN", "PUNCT"
+                "PRON", "AUX", "DET", "NOUN", "ADP", "PROPN", "PUNCT",
+                "CCONJ", "PRON", "AUX", "DET", "PROPN", "PUNCT"
         };
 
         String[] casPosCoarse = JCasUtil.select(cas, POS.class)
@@ -131,15 +131,15 @@ public class TestSpaCySLC {
 
         assertArrayEquals(posCoarse, casPosCoarse);
 
-        // String[] deps = new String[] {
-        //         "NSUBJ", "--", "DET", "ATTR", "PREP", "POBJ", "PUNCT", "CC", "NSUBJ", "--", "DET", "ATTR", "PUNCT"
-        // };
-        // String[] casDeps = JCasUtil.select(cas, Dependency.class)
-        //         .stream()
-        //         .map(Dependency::getDependencyType)
-        //         .toArray(String[]::new);
+        String[] deps = new String[] {
+                "NSUBJ", "--", "DET", "ATTR", "PREP", "POBJ", "PUNCT", "CC", "NSUBJ", "--", "DET", "ATTR", "PUNCT"
+        };
+        String[] casDeps = JCasUtil.select(cas, Dependency.class)
+                .stream()
+                .map(Dependency::getDependencyType)
+                .toArray(String[]::new);
 
-        // assertArrayEquals(deps, casDeps);
+        assertArrayEquals(deps, casDeps);
 
         // String[] ents = new String[] {
         //         // version 3.1.1
@@ -226,8 +226,8 @@ public class TestSpaCySLC {
         assertArrayEquals(pos, casPos);
 
         String[] posCoarse = new String[] {
-            "DET", "AUX", "DET", "NOUN", "ADP", "PROPN", "PUNCT",
-            "CCONJ", "DET", "AUX", "DET", "PROPN", "PUNCT"
+            "PRON", "AUX", "DET", "NOUN", "ADP", "PROPN", "PUNCT",
+            "CCONJ", "PRON", "AUX", "DET", "PROPN", "PUNCT"
         };
 
         String[] casPosCoarse = JCasUtil.select(cas, POS.class)
@@ -237,15 +237,15 @@ public class TestSpaCySLC {
 
         assertArrayEquals(posCoarse, casPosCoarse);
 
-        // String[] deps = new String[] {
-        //         "NSUBJ", "--", "DET", "ATTR", "PREP", "POBJ", "PUNCT", "CC", "NSUBJ", "--", "DET", "ATTR", "PUNCT"
-        // };
-        // String[] casDeps = JCasUtil.select(cas, Dependency.class)
-        //         .stream()
-        //         .map(Dependency::getDependencyType)
-        //         .toArray(String[]::new);
+        String[] deps = new String[] {
+                "NSUBJ", "--", "DET", "ATTR", "PREP", "POBJ", "PUNCT", "CC", "NSUBJ", "--", "DET", "ATTR", "PUNCT"
+        };
+        String[] casDeps = JCasUtil.select(cas, Dependency.class)
+                .stream()
+                .map(Dependency::getDependencyType)
+                .toArray(String[]::new);
 
-        // assertArrayEquals(deps, casDeps);
+        assertArrayEquals(deps, casDeps);
 
         // String[] ents = new String[] {
         //         // version 3.1.1
@@ -335,16 +335,16 @@ public class TestSpaCySLC {
 
         assertArrayEquals(posCoarse, casPosCoarse);
 
-        // String[] deps = new String[] {
-        //         "SB", "--", "NK", "PD", "PG", "NK", "PUNCT", "JU", "SB", "--", "NK", "PD", "PUNCT"
-        // };
+        String[] deps = new String[] {
+                "SB", "--", "NK", "PD", "PG", "NK", "PUNCT", "JU", "SB", "--", "NK", "PD", "PUNCT"
+        };
 
-        // String[] casDeps = JCasUtil.select(cas, Dependency.class)
-        //         .stream()
-        //         .map(Dependency::getDependencyType)
-        //         .toArray(String[]::new);
+        String[] casDeps = JCasUtil.select(cas, Dependency.class)
+                .stream()
+                .map(Dependency::getDependencyType)
+                .toArray(String[]::new);
 
-        // assertArrayEquals(deps, casDeps);
+        assertArrayEquals(deps, casDeps);
 
         // String[] ents = new String[] {
         //         // version 3.1.1

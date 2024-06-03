@@ -60,8 +60,17 @@ class SpaCyToken(Offset):
     tag: str
     lemma: str
     morph: dict[str, str]
+    idx: int
+
+
+class SpaCyDependency(Offset):
+    governor: int
+    dependent: int
+    type: str
+    flavor: str
 
 
 class SpaCyAnnotations(BaseModel):
     sentences: list[Offset]
     tokens: list[SpaCyToken]
+    dependencies: list[SpaCyDependency]

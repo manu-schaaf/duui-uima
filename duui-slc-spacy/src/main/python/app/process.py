@@ -1,9 +1,9 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 import itertools
 import logging
-from spacy.tokens import Doc, Span
+from spacy.tokens import Doc, Span, Token
 
-from app.model import Offset, SpaCyAnnotations, SpaCyToken
+from app.model import Offset, SpaCyAnnotations, SpaCyDependency, SpaCyToken
 
 logger = logging.getLogger(__name__)
 
@@ -60,8 +60,29 @@ class SentenceValidation:
         return cls(True, True, True, True, True)
 
 
+@dataclass
+class TokenToId:
+    mapping: dict[int, int] = field(default_factory=dict)
+
+    def __getitem__(self, token: Token):
+        return self.mapping[hash(token)]
+
+    def __setitem__(self, token: Token, value: int):
+        if hash(token) in self.mapping:
+            raise ValueError(f"Token {token} already exists in the mapping.")
+        if value != len(self.mapping):
+            raise ValueError(f"Value {value} is not the next value in the mapping.")
+        self.mapping[hash(token)] = value
+
+    def add(self, token: Token) -> int:
+        _hash = hash(token)
+        self.mapping[_hash] = len(self.mapping)
+        return self.mapping[_hash]
+
+
 def post_process(annotations: list[Doc], offsets: list[Offset]):
-    results = SpaCyAnnotations(sentences=[], tokens=[])
+    token_to_id = TokenToId()
+    results = SpaCyAnnotations(sentences=[], tokens=[], dependencies=[])
     for doc, offset in zip(annotations, offsets):
         # Add a None to the end of the iterator to include the last sentence if it ends with a semicolon.
         it = itertools.chain(doc.sents, (None,))
@@ -90,11 +111,10 @@ def post_process(annotations: list[Doc], offsets: list[Offset]):
                     )
                 )
                 for token in sentence:
-                    logger.info(
-                        f"token: {token.text}, {token.idx}, {token.pos_}, {token.tag_}, {token.lemma_}"
-                    )
+                    token_idx = token_to_id.add(token)
+
                     begin = token.idx + offset.begin
-                    # No need to add one: already points to the next character
+                    # No need to add one here: already points to the next character
                     end = begin + len(token)
                     results.tokens.append(
                         SpaCyToken(
@@ -106,6 +126,21 @@ def post_process(annotations: list[Doc], offsets: list[Offset]):
                             morph={
                                 k.lower(): v for k, v in token.morph.to_dict().items()
                             },
+                            idx=token_idx,
+                        )
+                    )
+
+                for token in sentence:
+                    begin = token.idx + offset.begin
+                    end = begin + len(token)
+                    results.dependencies.append(
+                        SpaCyDependency(
+                            begin=begin,
+                            end=end,
+                            governor=token_to_id[token.head],
+                            dependent=token_to_id[token],
+                            type=token.dep_.upper(),
+                            flavor="basic",
                         )
                     )
 

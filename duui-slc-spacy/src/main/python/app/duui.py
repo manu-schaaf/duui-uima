@@ -115,7 +115,6 @@ class SpaCyModelProxy:
             nlp = spacy.load(
                 lang,
                 disable=[
-                    "parser",
                     "ner",
                 ],
             )

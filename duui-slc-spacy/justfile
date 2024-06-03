@@ -1,9 +1,11 @@
-export VERSION := "0.0.1"
+export VERSION := "0.0.2"
+export REPOSITORY := "docker.texttechnologylab.org"
+export BASE_NAME := "duui-slc-spacy"
 
 base version=VERSION:
     docker build \
         --build-arg CUDA_VERSION="12.4.1" \
-        -t docker.texttechnologylab.org/duui-slc-spacy/cu124/base:{{version}} \
+        -t {{REPOSITORY}}/{{BASE_NAME}}/cu124/base:{{version}} \
         -f src/main/docker/Dockerfile.base src/main/
 
 build version=VERSION:
@@ -11,11 +13,19 @@ build version=VERSION:
     docker build \
         --build-arg CUDA_VERSION="cu124" \
         --build-arg BASE_VERSION="{{version}}" \
-        -t docker.texttechnologylab.org/duui-slc-spacy/cu124:{{version}} \
+        -t {{REPOSITORY}}/{{BASE_NAME}}/cu124:{{version}} \
         -f src/main/docker/Dockerfile src/main/
 
 test version=VERSION:
-    docker container ls | grep duui-slc-spacy-test && docker stop duui-slc-spacy-test && docker rm duui-slc-spacy-test || echo ""
-    docker run --rm --name duui-slc-spacy-test -d -p 9714:9714 docker.texttechnologylab.org/duui-slc-spacy/cu124:{{version}}
+    docker container ls | grep {{BASE_NAME}}-test && docker stop {{BASE_NAME}}-test && docker rm {{BASE_NAME}}-test || echo ""
+    docker run --rm --name {{BASE_NAME}}-test -d -p 9714:9714 {{REPOSITORY}}/{{BASE_NAME}}/cu124:{{version}}
     sleep 2 && mvn test || echo "Tests failed"
-    docker stop duui-slc-spacy-test
+    docker stop {{BASE_NAME}}-test
+
+tag version=VERSION as="latest":
+    docker tag {{REPOSITORY}}/{{BASE_NAME}}/cu124/base:{{version}} {{REPOSITORY}}/{{BASE_NAME}}/cu124/base:latest
+    docker tag {{REPOSITORY}}/{{BASE_NAME}}/cu124:{{version}} {{REPOSITORY}}/{{BASE_NAME}}/cu124:latest
+
+push version=VERSION:
+    docker push {{REPOSITORY}}/{{BASE_NAME}}/cu124/base:{{version}}
+    docker push {{REPOSITORY}}/{{BASE_NAME}}/cu124:{{version}}

@@ -93,28 +93,19 @@ function deserialize(inputCas, inputStream)
         sent_anno:setEnd(sent["end"])
         sent_anno:addToIndexes()
 
-        -- Create annotator meta data annotation, using the base meta data
-        -- local meta_anno = luajava.newInstance("org.texttechnologylab.annotation.SpacyAnnotatorMetaData", inputCas)
-        -- meta_anno:setReference(sent_anno)
-        -- meta_anno:setName(meta["name"])
-        -- meta_anno:setVersion(meta["version"])
-        -- meta_anno:setModelName(meta["modelName"])
-        -- meta_anno:setModelVersion(meta["modelVersion"])
-        -- meta_anno:setSpacyVersion(meta["spacyVersion"])
-        -- meta_anno:setModelLang(meta["modelLang"])
-        -- meta_anno:setModelSpacyVersion(meta["modelSpacyVersion"])
-        -- meta_anno:setModelSpacyGitVersion(meta["modelSpacyGitVersion"])
-        -- meta_anno:addToIndexes()
     end
 
     -- Add tokens
     -- Save all tokens, to allow for retrieval in dependencies
+    local all_tokens = {}
     for i, token in ipairs(results["tokens"]) do
         -- Create token annotation
         local token_anno = luajava.newInstance("de.tudarmstadt.ukp.dkpro.core.api.segmentation.type.Token", inputCas)
         token_anno:setBegin(token["begin"])
         token_anno:setEnd(token["end"])
         token_anno:addToIndexes()
+
+        all_tokens[token["idx"]] = token_anno
 
         -- TODO: remove -- URL detection
         -- if token["like_url"] then
@@ -136,18 +127,6 @@ function deserialize(inputCas, inputStream)
         --     url_anno:addToIndexes()
         -- end
 
-        -- TODO -- Create meta data for this token
-        -- local meta_anno = luajava.newInstance("org.texttechnologylab.annotation.SpacyAnnotatorMetaData", inputCas)
-        -- meta_anno:setReference(token_anno)
-        -- meta_anno:setName(meta["name"])
-        -- meta_anno:setVersion(meta["version"])
-        -- meta_anno:setModelName(meta["modelName"])
-        -- meta_anno:setModelVersion(meta["modelVersion"])
-        -- meta_anno:setSpacyVersion(meta["spacyVersion"])
-        -- meta_anno:setModelLang(meta["modelLang"])
-        -- meta_anno:setModelSpacyVersion(meta["modelSpacyVersion"])
-        -- meta_anno:setModelSpacyGitVersion(meta["modelSpacyGitVersion"])
-        -- meta_anno:addToIndexes()
 
         if token["lemma"] ~= nil then
             local lemma_anno = luajava.newInstance("de.tudarmstadt.ukp.dkpro.core.api.segmentation.type.Lemma", inputCas)
@@ -157,18 +136,6 @@ function deserialize(inputCas, inputStream)
             lemma_anno:addToIndexes()
 
             token_anno:setLemma(lemma_anno)
-            
-            -- TODO -- local meta_anno = luajava.newInstance("org.texttechnologylab.annotation.SpacyAnnotatorMetaData", inputCas)
-            -- meta_anno:setReference(lemma_anno)
-            -- meta_anno:setName(meta["name"])
-            -- meta_anno:setVersion(meta["version"])
-            -- meta_anno:setModelName(meta["modelName"])
-            -- meta_anno:setModelVersion(meta["modelVersion"])
-            -- meta_anno:setSpacyVersion(meta["spacyVersion"])
-            -- meta_anno:setModelLang(meta["modelLang"])
-            -- meta_anno:setModelSpacyVersion(meta["modelSpacyVersion"])
-            -- meta_anno:setModelSpacyGitVersion(meta["modelSpacyGitVersion"])
-            -- meta_anno:addToIndexes()
         end
 
         if token["pos"] ~= nil then
@@ -183,18 +150,6 @@ function deserialize(inputCas, inputStream)
             pos_anno:addToIndexes()
 
             token_anno:setPos(pos_anno)
-
-            -- TODO -- local meta_anno = luajava.newInstance("org.texttechnologylab.annotation.SpacyAnnotatorMetaData", inputCas)
-            -- meta_anno:setReference(pos_anno)
-            -- meta_anno:setName(meta["name"])
-            -- meta_anno:setVersion(meta["version"])
-            -- meta_anno:setModelName(meta["modelName"])
-            -- meta_anno:setModelVersion(meta["modelVersion"])
-            -- meta_anno:setSpacyVersion(meta["spacyVersion"])
-            -- meta_anno:setModelLang(meta["modelLang"])
-            -- meta_anno:setModelSpacyVersion(meta["modelSpacyVersion"])
-            -- meta_anno:setModelSpacyGitVersion(meta["modelSpacyGitVersion"])
-            -- meta_anno:addToIndexes()
         end
 
         if token["morph"] ~= nil then
@@ -262,18 +217,40 @@ function deserialize(inputCas, inputStream)
             morph_anno:addToIndexes()
 
             token_anno:setMorph(morph_anno)
-
-            -- TODO -- local meta_anno = luajava.newInstance("org.texttechnologylab.annotation.SpacyAnnotatorMetaData", inputCas)
-            -- meta_anno:setReference(morph_anno)
-            -- meta_anno:setName(meta["name"])
-            -- meta_anno:setVersion(meta["version"])
-            -- meta_anno:setModelName(meta["modelName"])
-            -- meta_anno:setModelVersion(meta["modelVersion"])
-            -- meta_anno:setSpacyVersion(meta["spacyVersion"])
-            -- meta_anno:setModelLang(meta["modelLang"])
-            -- meta_anno:setModelSpacyVersion(meta["modelSpacyVersion"])
-            -- meta_anno:setModelSpacyGitVersion(meta["modelSpacyGitVersion"])
-            -- meta_anno:addToIndexes()
         end
+    end
+
+    -- Add dependencies
+    for i, dep in ipairs(results["dependencies"]) do
+        -- Create specific annotation based on type
+        local dep_anno
+        if dep["type"] == "ROOT" then
+            dep_anno = luajava.newInstance("de.tudarmstadt.ukp.dkpro.core.api.syntax.type.dependency.ROOT", inputCas)
+            dep_anno:setDependencyType("--")
+        else
+            dep_anno = luajava.newInstance("de.tudarmstadt.ukp.dkpro.core.api.syntax.type.dependency.Dependency", inputCas)
+            dep_anno:setDependencyType(dep["type"])
+        end
+
+        dep_anno:setBegin(dep["begin"])
+        dep_anno:setEnd(dep["end"])
+        dep_anno:setFlavor(dep["flavor"])
+
+        -- Get needed tokens via indices
+        governor_token = all_tokens[dep["governor"]]
+        if governor_token ~= nil then
+            dep_anno:setGovernor(governor_token)
+        end
+
+        dependent_token = all_tokens[dep["dependent"]]
+        if governor_token ~= nil then
+            dep_anno:setDependent(dependent_token)
+        end
+
+        if governor_token ~= nil and dependent_token ~= nil then
+            dependent_token:setParent(governor_token)
+        end
+
+        dep_anno:addToIndexes()
     end
 end
