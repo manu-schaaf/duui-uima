@@ -1,0 +1,18 @@
+ARG CUDA_VERSION="12.4.1"
+
+FROM ghcr.io/mamba-org/micromamba:jammy-cuda-${CUDA_VERSION}
+
+RUN micromamba install -y -n base -c conda-forge spacy cupy \
+    && micromamba clean --all --yes
+
+ARG MAMBA_DOCKERFILE_ACTIVATE=1
+ENV PATH=/opt/conda/bin/:$PATH
+
+RUN python -m spacy download en_core_web_sm \
+    && python -m spacy download de_core_news_sm \
+    && python -m spacy download en_core_web_trf \
+    && python -m spacy download de_core_news_trf
+
+HEALTHCHECK CMD python -m spacy validate
+
+ENTRYPOINT ["/usr/local/bin/_entrypoint.sh"]

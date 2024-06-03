@@ -1,0 +1,14 @@
+export VERSION := "0.0.1"
+
+base version=VERSION:
+    docker build \
+        --build-arg CUDA_VERSION="12.4.1" \
+        -t docker.texttechnologylab.org/duui-slc-spacy/cu124/base:{{version}} \
+        -f src/main/docker/Dockerfile.base src/
+
+build version=VERSION:
+    just base {{version}}
+    docker build \
+        --build-arg CUDA_VERSION="12.4.1" \
+        -t docker.texttechnologylab.org/duui-slc-spacy/cu124:{{version}} \
+        -f src/main/docker/Dockerfile src/
