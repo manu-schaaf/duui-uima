@@ -4,11 +4,18 @@ base version=VERSION:
     docker build \
         --build-arg CUDA_VERSION="12.4.1" \
         -t docker.texttechnologylab.org/duui-slc-spacy/cu124/base:{{version}} \
-        -f src/main/docker/Dockerfile.base src/
+        -f src/main/docker/Dockerfile.base src/main/
 
 build version=VERSION:
     just base {{version}}
     docker build \
-        --build-arg CUDA_VERSION="12.4.1" \
+        --build-arg CUDA_VERSION="cu124" \
+        --build-arg BASE_VERSION="{{version}}" \
         -t docker.texttechnologylab.org/duui-slc-spacy/cu124:{{version}} \
-        -f src/main/docker/Dockerfile src/
+        -f src/main/docker/Dockerfile src/main/
+
+test version=VERSION:
+    docker container ls | grep duui-slc-spacy-test && docker stop duui-slc-spacy-test && docker rm duui-slc-spacy-test || echo ""
+    docker run --rm --name duui-slc-spacy-test -d -p 9714:9714 docker.texttechnologylab.org/duui-slc-spacy/cu124:{{version}}
+    sleep 2 && mvn test || echo "Tests failed"
+    docker stop duui-slc-spacy-test
