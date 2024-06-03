@@ -35,7 +35,7 @@ import java.nio.file.Paths;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 
-public class SpaCyMultiTest {
+public class TestSpaCySLC {
     static DUUIComposer composer;
     static JCas cas;
 

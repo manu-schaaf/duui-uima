@@ -5,7 +5,6 @@ import traceback
 from threading import Lock
 from pathlib import Path
 
-from pydantic import BaseModel
 import spacy
 from app.model import (
     DUUICapability,
@@ -28,17 +27,16 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
-lua_communication_layer = ""
-if (
-    path := Path(
-        os.environ.get("COMMUNICATION_LAYER_PATH", "lua_communication_layer.lua")
-    )
-).exists():
+lua_path = Path(
+    os.environ.get("COMMUNICATION_LAYER_PATH", "communication_layer.lua")
+)
+
+if lua_path.exists():
     logger.debug("Loading Lua communication layer from file")
-    with path.open("r", encoding="utf-8") as f:
+    with lua_path.open("r", encoding="utf-8") as f:
         lua_communication_layer = f.read()
 else:
-    raise FileNotFoundError("Lua communication layer not found")
+    raise FileNotFoundError(f"Lua communication layer not found: {lua_path}")
 
 
 @v1_api.get("/v1/communication_layer", response_class=PlainTextResponse, tags=["DUUI"])
@@ -47,13 +45,13 @@ def get_communication_layer() -> str:
     return lua_communication_layer
 
 
-type_system = ""
-if (path := Path(os.environ.get("TYPE_SYSTEM_PATH", "dkpro-core-types.xml"))).exists():
+type_system_path = Path(os.environ.get("TYPE_SYSTEM_PATH", "dkpro-core-types.xml"))
+if (type_system_path).exists():
     logger.debug("Loading type system from file")
-    with path.open("r", encoding="utf-8") as f:
+    with type_system_path.open("r", encoding="utf-8") as f:
         type_system = f.read()
 else:
-    raise FileNotFoundError("Type system not found")
+    raise FileNotFoundError(f"Type system not found: {type_system_path}")
 
 
 @v1_api.get("/v1/typesystem", tags=["DUUI"])
