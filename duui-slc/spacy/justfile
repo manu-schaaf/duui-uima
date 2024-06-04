@@ -6,7 +6,7 @@ import? '../base/justfile'
 export CUDA_NAME := "cu124"
 export CUDA_VERSION := "12.4.1"
 
-export VERSION := "0.2.1"
+export VERSION := "0.3.0"
 
 export REPOSITORY := "docker.texttechnologylab.org"
 export BASE_NAME := "duui-slc-spacy"
