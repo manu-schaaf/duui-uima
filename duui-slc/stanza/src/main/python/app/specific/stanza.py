@@ -1,3 +1,4 @@
+import enum
 import logging
 from typing import Self
 
@@ -31,7 +32,7 @@ class StanzaModelProxy(ModelProxyABC[Pipeline]):
     def __getitem__(self, lang: str):
         lang = model_map.get(lang.replace("-", "_"), lang)
         if self.models.get(lang) is None:
-            logger.info(f"load({lang})")
+            logger.debug(f"load({lang})")
             nlp = stanza.Pipeline(
                 lang=lang,
                 processors="tokenize,mwt,pos,lemma,depparse",
@@ -39,7 +40,7 @@ class StanzaModelProxy(ModelProxyABC[Pipeline]):
                 download_method=DownloadMethod.REUSE_RESOURCES,
             )
             self.models[lang] = nlp
-            logger.info(f"load({lang}): done")
+            logger.debug(f"load({lang}): done")
         return self.models[lang]
 
 
@@ -58,6 +59,17 @@ class StanzaSentenceValidator(SentenceValidatorABC[Sentence]):
         if sentence.text.count("(") != sentence.text.count(")"):
             return cls(True, True, True, True, False)
         return cls(True, True, True, True, True)
+
+
+class MultiWordToken(enum.IntEnum):
+    NONE = enum.auto()
+    """A regular word"""
+
+    PART = enum.auto()
+    """A word that is part of a multi-word token"""
+
+    MWT = enum.auto()
+    """The multi-word token itself"""
 
 
 class StanzaProcessor(ProcessorABC[Document]):
@@ -90,8 +102,6 @@ class StanzaProcessor(ProcessorABC[Document]):
         word_to_id = TokenToId()
         results = DuuiResponse(sentences=None, tokens=[], dependencies=[])
         for doc, offset in zip(annotations, offsets):
-            logger.info(doc)  # TODO: Remove this line
-
             # Add a None to the end of the iterator to include the last sentence if it ends with a semicolon.
             for sentence in doc.sentences:
                 if not bool(StanzaSentenceValidator.check(sentence).is_standalone()):
@@ -106,30 +116,63 @@ class StanzaProcessor(ProcessorABC[Document]):
                         try:
                             word_idx = word_to_id.add(word)
 
-                            begin = word.start_char + offset.begin
-                            end = begin + len(word.text)
-                            results.tokens.append(
-                                UimaToken(
-                                    begin=begin,
-                                    end=end,
-                                    pos=word.upos,
-                                    tag=word.xpos,
-                                    lemma=word.lemma,
-                                    morph=(
-                                        {
-                                            k.lower(): v
-                                            for k, v in (
-                                                feat.split("=")
-                                                for feat in word.feats.split("|")
-                                                if "=" in feat
-                                            )
-                                        }
-                                        if word.feats
-                                        else None
-                                    ),
-                                    idx=word_idx,
-                                )
+                            mwt, begin, end = StanzaProcessor.mwt_bounds(
+                                token, word, offset
                             )
+
+                            match mwt:
+                                case MultiWordToken.NONE:
+                                    uima_token = UimaToken(
+                                        begin=begin,
+                                        end=end,
+                                        idx=word_idx,
+                                        pos=word.upos,
+                                        tag=word.xpos,
+                                        lemma=word.lemma,
+                                        morph=(
+                                            {
+                                                k.lower(): v
+                                                for k, v in (
+                                                    feat.split("=")
+                                                    for feat in word.feats.split("|")
+                                                    if "=" in feat
+                                                )
+                                            }
+                                            if word.feats
+                                            else None
+                                        ),
+                                    )
+                                case MultiWordToken.PART:
+                                    uima_token = UimaToken(
+                                        begin=begin,
+                                        end=end,
+                                        idx=word_idx,
+                                        pos=word.upos,
+                                        tag=word.xpos,
+                                        lemma=word.lemma,
+                                        morph=(
+                                            {
+                                                k.lower(): v
+                                                for k, v in (
+                                                    feat.split("=")
+                                                    for feat in word.feats.split("|")
+                                                    if "=" in feat
+                                                )
+                                            }
+                                            if word.feats
+                                            else None
+                                        ),
+                                        form=word.text,
+                                    )
+                                case MultiWordToken.MWT:
+                                    # TODO: consider removing this case
+                                    uima_token = UimaToken(
+                                        begin=begin,
+                                        end=end,
+                                        idx=word_idx,
+                                    )
+
+                            results.tokens.append(uima_token)
                         except Exception as e:
                             logger.error(
                                 f"Error processing word:  \n{word}\n"
@@ -140,17 +183,41 @@ class StanzaProcessor(ProcessorABC[Document]):
                 for token in tokens:
                     words: list[Word] = token.words
                     for word in words:
-                        begin = word.start_char + offset.begin
-                        end = begin + len(word.text)
+                        mwt, begin, end = StanzaProcessor.mwt_bounds(
+                            token, word, offset
+                        )
+
+                        if mwt == MultiWordToken.MWT:
+                            continue
+
                         results.dependencies.append(
                             UimaDependency(
                                 begin=begin,
                                 end=end,
                                 governor=word_to_id[sentence.words[word.head]],
                                 dependent=word_to_id[word],
-                                type=word.deprel.upper(),
+                                type=word.deprel,
                                 flavor="basic",
                             )
                         )
 
         return results
+
+    @staticmethod
+    def mwt_bounds(token: Token, word: Word, offset: Offset):
+        if not isinstance(word.id, int):
+            # Case for a multi-word token
+            # NOTE: Unreachable, as the MWT is a Token, not a Word!
+            # TODO: Consider removing this case
+            mwt = MultiWordToken.MWT
+            begin = word.start_char + offset.begin
+            end = word.end_char + offset.begin
+        elif word.start_char is None:
+            mwt = MultiWordToken.PART
+            begin = token.start_char + offset.begin
+            end = token.end_char + offset.begin
+        else:
+            mwt = MultiWordToken.NONE
+            begin = word.start_char + offset.begin
+            end = word.end_char + offset.begin
+        return mwt, begin, end

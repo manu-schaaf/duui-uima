@@ -5,6 +5,7 @@ import de.tudarmstadt.ukp.dkpro.core.api.ner.type.NamedEntity;
 import de.tudarmstadt.ukp.dkpro.core.api.segmentation.type.Sentence;
 import de.tudarmstadt.ukp.dkpro.core.api.segmentation.type.Paragraph;
 import de.tudarmstadt.ukp.dkpro.core.api.segmentation.type.Token;
+import de.tudarmstadt.ukp.dkpro.core.api.segmentation.type.TokenForm;
 import de.tudarmstadt.ukp.dkpro.core.api.segmentation.type.Lemma;
 import de.tudarmstadt.ukp.dkpro.core.api.syntax.type.dependency.Dependency;
 import org.apache.uima.UIMAException;
@@ -33,6 +34,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.Objects;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 
@@ -86,6 +88,7 @@ public class TestStanza {
         // id: 3   word: atteint   head id: 0      head: root      deprel: root
         // id: 4   word: la        head id: 5      head: fin       deprel: det
         // id: 5   word: fin       head id: 3      head: atteint   deprel: obj
+        // id: 6-7 word: du
         // id: 6   word: de        head id: 8      head: sentier   deprel: case
         // id: 7   word: le        head id: 8      head: sentier   deprel: det
         // id: 8   word: sentier   head id: 5      head: fin       deprel: nmod
@@ -104,7 +107,7 @@ public class TestStanza {
         };
         String[] casTokens = JCasUtil.select(cas, Token.class)
                 .stream()
-                .map(Token::getCoveredText)
+                .map(t -> Objects.isNull(t.getForm()) ? t.getCoveredText() : t.getForm().getValue())
                 .toArray(String[]::new);
         
         assertArrayEquals(tokens, casTokens);
