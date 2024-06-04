@@ -27,5 +27,13 @@ WORKDIR /duui
 COPY --from=base /duui /duui
 COPY ./python/app/specific/*.py /duui/app/specific/
 
+
+HEALTHCHECK --interval=30s --timeout=5s \
+    CMD curl --silent --fail \
+        -X POST \
+        -H "Content-Type: application/json" \
+        --data '{"text": "Barack Obama was born in Hawaii.", "language": "en", "sentences": [{"begin": 0, "end": 32}]}' \
+        localhost:9714/v1/process || exit 1
+
 ENTRYPOINT [ "gunicorn", "wsgi:app", "-b", "0.0.0.0:9714", "-k", "uvicorn.workers.UvicornWorker" ]
 CMD [ "-w", "1" ]
