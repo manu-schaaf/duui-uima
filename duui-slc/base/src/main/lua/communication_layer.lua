@@ -85,17 +85,22 @@ function deserialize(inputCas, inputStream)
     -- local meta = results["meta"]
 
     -- Add sentences
-    for i, sent in ipairs(results["sentences"]) do
-        -- Note: spaCy will still run the full pipeline, and all results are based on these results
-        -- Create sentence annotation
-        local sent_anno = luajava.newInstance("de.tudarmstadt.ukp.dkpro.core.api.segmentation.type.Sentence", inputCas)
-        sent_anno:setBegin(sent["begin"])
-        sent_anno:setEnd(sent["end"])
-        sent_anno:addToIndexes()
-
+    if results["sentences"] ~= nil then
+        for i, sent in ipairs(results["sentences"]) do
+            -- Note: spaCy will still run the full pipeline, and all results are based on these results
+            -- Create sentence annotation
+            local sent_anno = luajava.newInstance("de.tudarmstadt.ukp.dkpro.core.api.segmentation.type.Sentence", inputCas)
+            sent_anno:setBegin(sent["begin"])
+            sent_anno:setEnd(sent["end"])
+            sent_anno:addToIndexes()
+        end
     end
 
     -- Add tokens
+    if results["tokens"] == nil then
+        error("No tokens were returned by the annotator", 2)
+    end
+
     -- Save all tokens, to allow for retrieval in dependencies
     local all_tokens = {}
     for i, token in ipairs(results["tokens"]) do
@@ -221,6 +226,9 @@ function deserialize(inputCas, inputStream)
     end
 
     -- Add dependencies
+    if results["dependencies"] == nil then
+        error("No dependencies were returned by the annotator", 2)
+    end
     for i, dep in ipairs(results["dependencies"]) do
         -- Create specific annotation based on type
         local dep_anno
