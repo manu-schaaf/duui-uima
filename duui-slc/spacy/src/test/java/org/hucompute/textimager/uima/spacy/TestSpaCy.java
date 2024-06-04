@@ -35,7 +35,7 @@ import java.nio.file.Paths;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 
-public class TestSpaCySLC {
+public class TestSpaCy {
     static DUUIComposer composer;
     static JCas cas;
 
@@ -132,7 +132,7 @@ public class TestSpaCySLC {
         assertArrayEquals(posCoarse, casPosCoarse);
 
         String[] deps = new String[] {
-                "NSUBJ", "--", "DET", "ATTR", "PREP", "POBJ", "PUNCT", "CC", "NSUBJ", "--", "DET", "ATTR", "PUNCT"
+                "nsubj", "--", "det", "attr", "prep", "pobj", "punct", "cc", "nsubj", "--", "det", "attr", "punct"
         };
         String[] casDeps = JCasUtil.select(cas, Dependency.class)
                 .stream()
@@ -238,7 +238,7 @@ public class TestSpaCySLC {
         assertArrayEquals(posCoarse, casPosCoarse);
 
         String[] deps = new String[] {
-                "NSUBJ", "--", "DET", "ATTR", "PREP", "POBJ", "PUNCT", "CC", "NSUBJ", "--", "DET", "ATTR", "PUNCT"
+                "nsubj", "--", "det", "attr", "prep", "pobj", "punct", "cc", "nsubj", "--", "det", "attr", "punct"
         };
         String[] casDeps = JCasUtil.select(cas, Dependency.class)
                 .stream()
@@ -336,7 +336,7 @@ public class TestSpaCySLC {
         assertArrayEquals(posCoarse, casPosCoarse);
 
         String[] deps = new String[] {
-                "SB", "--", "NK", "PD", "PG", "NK", "PUNCT", "JU", "SB", "--", "NK", "PD", "PUNCT"
+                "sb", "--", "nk", "pd", "pg", "nk", "punct", "ju", "sb", "--", "nk", "pd", "punct"
         };
 
         String[] casDeps = JCasUtil.select(cas, Dependency.class)
