@@ -2,6 +2,7 @@
 StandardCharsets = luajava.bindClass("java.nio.charset.StandardCharsets")
 JCasUtil = luajava.bindClass("org.apache.uima.fit.util.JCasUtil")
 Token = luajava.bindClass("de.tudarmstadt.ukp.dkpro.core.api.segmentation.type.Token")
+TokenForm = luajava.bindClass("de.tudarmstadt.ukp.dkpro.core.api.segmentation.type.TokenForm")
 Sentence = luajava.bindClass("de.tudarmstadt.ukp.dkpro.core.api.segmentation.type.Sentence")
 Paragraph = luajava.bindClass("de.tudarmstadt.ukp.dkpro.core.api.segmentation.type.Paragraph")
 
@@ -109,6 +110,16 @@ function deserialize(inputCas, inputStream)
         token_anno:setBegin(token["begin"])
         token_anno:setEnd(token["end"])
         token_anno:addToIndexes()
+
+        if token["form"] ~= nil then  -- Token is part of a MWT
+            local token_form = luajava.newInstance("de.tudarmstadt.ukp.dkpro.core.api.segmentation.type.TokenForm", inputCas)
+            token_form:setBegin(token["begin"])
+            token_form:setEnd(token["end"])
+            token_form:setValue(token["form"])
+            token_form:addToIndexes()
+
+            token_anno:setForm(token_form)
+        end
 
         all_tokens[token["idx"]] = token_anno
 

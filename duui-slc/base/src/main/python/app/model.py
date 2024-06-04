@@ -61,6 +61,7 @@ class UimaToken(Offset):
     tag: str | None = None
     lemma: str | None = None
     morph: dict[str, str] | None = None
+    form: str | None = None
 
 
 class UimaDependency(Offset):
