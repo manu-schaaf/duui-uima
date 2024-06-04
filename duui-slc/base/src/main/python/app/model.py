@@ -45,7 +45,7 @@ class DuuiRequest(BaseModel):
     """Request model"""
 
     text: str
-    language: Literal["en", "de"]
+    language: Literal["en", "de"] | str
     sentences: list[Offset] | None = None
     paragraphs: list[Offset] | None = None
 
@@ -56,11 +56,11 @@ class ErrorMessage(BaseModel):
 
 
 class UimaToken(Offset):
-    pos: str
-    tag: str
-    lemma: str
-    morph: dict[str, str]
-    idx: int
+    pos: str | None
+    tag: str | None
+    lemma: str | None
+    morph: dict[str, str] | None
+    idx: int | None
 
 
 class UimaDependency(Offset):
@@ -71,6 +71,6 @@ class UimaDependency(Offset):
 
 
 class DuuiResponse(BaseModel):
-    sentences: list[Offset]
-    tokens: list[UimaToken]
-    dependencies: list[UimaDependency]
+    sentences: list[Offset] | None
+    tokens: list[UimaToken] | None
+    dependencies: list[UimaDependency] | None
