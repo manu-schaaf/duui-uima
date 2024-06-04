@@ -1,4 +1,4 @@
-package org.hucompute.textimager.uima.spacy;
+package org.hucompute.textimager.uima.stanza;
 
 import de.tudarmstadt.ukp.dkpro.core.api.lexmorph.type.pos.POS;
 import de.tudarmstadt.ukp.dkpro.core.api.ner.type.NamedEntity;
@@ -36,7 +36,7 @@ import java.nio.file.Paths;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 
-public class Test {
+public class TestStanza {
     static DUUIComposer composer;
     static JCas cas;
 
@@ -71,8 +71,12 @@ public class Test {
         composer.add(
                 new DUUIRemoteDriver.Component("http://localhost:9714"));
 
-        cas.setDocumentText("Nous avons atteint la fin du sentier.");
+        String text = "Nous avons atteint la fin du sentier.";
+        cas.setDocumentText(text);
         cas.setDocumentLanguage("fr");
+
+        Sentence sentence = new Sentence(cas, 0, text.length());
+        sentence.addToIndexes();
 
         composer.run(cas);
 
@@ -129,8 +133,12 @@ public class Test {
         composer.add(
                 new DUUIRemoteDriver.Component("http://localhost:9714"));
 
-        cas.setDocumentText("Barack Obama was born in Hawaii.");
+        String text = "Barack Obama was born in Hawaii.";
+        cas.setDocumentText(text);
         cas.setDocumentLanguage("en");
+
+        Sentence sentence = new Sentence(cas, 0, text.length());
+        sentence.addToIndexes();
 
         composer.run(cas);
 

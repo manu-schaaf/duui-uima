@@ -3,7 +3,10 @@ set allow-duplicate-variables := true
 
 import? '../base/justfile'
 
-export VERSION := "0.1.1"
+export CUDA_NAME := "cu124"
+export CUDA_VERSION := "12.4.1"
+
+export VERSION := "0.2.1"
 
 export REPOSITORY := "docker.texttechnologylab.org"
 export BASE_NAME := "duui-slc-stanza"
@@ -11,21 +14,20 @@ export BASE_NAME := "duui-slc-stanza"
 build version=VERSION:
     just base {{version}}
     docker build \
-        --build-arg CUDA_NAME="cu124" \
-        --build-arg BASE_VERSION="{{version}}" \
-        -t {{REPOSITORY}}/{{BASE_NAME}}/cu124:{{version}} \
+        --build-arg CUDA_NAME="{{CUDA_NAME}}" \
+        --build-arg CUDA_VERSION="{{CUDA_VERSION}}" \
+        --build-arg VERSION="{{VERSION}}" \
+        -t {{REPOSITORY}}/{{BASE_NAME}}/{{CUDA_NAME}}:{{version}} \
         -f src/main/docker/Dockerfile src/main/
 
 test version=VERSION:
     docker container ls | grep {{BASE_NAME}}-test && docker stop {{BASE_NAME}}-test && docker rm {{BASE_NAME}}-test || echo ""
-    docker run --rm --name {{BASE_NAME}}-test -d -p 9714:9714 {{REPOSITORY}}/{{BASE_NAME}}/cu124:{{version}}
+    docker run --rm --name {{BASE_NAME}}-test -d -p 9714:9714 {{REPOSITORY}}/{{BASE_NAME}}/{{CUDA_NAME}}:{{version}}
     sleep 2 && mvn test || echo "Tests failed"
     docker stop {{BASE_NAME}}-test
 
 tag version=VERSION as="latest":
-    docker tag {{REPOSITORY}}/{{BASE_NAME}}/cu124/base:{{version}} {{REPOSITORY}}/{{BASE_NAME}}/cu124/base:latest
-    docker tag {{REPOSITORY}}/{{BASE_NAME}}/cu124:{{version}} {{REPOSITORY}}/{{BASE_NAME}}/cu124:latest
+    docker tag {{REPOSITORY}}/{{BASE_NAME}}/{{CUDA_NAME}}:{{version}} {{REPOSITORY}}/{{BASE_NAME}}/{{CUDA_NAME}}:latest
 
 push version=VERSION:
-    docker push {{REPOSITORY}}/{{BASE_NAME}}/cu124/base:{{version}}
-    docker push {{REPOSITORY}}/{{BASE_NAME}}/cu124:{{version}}
+    docker push {{REPOSITORY}}/{{BASE_NAME}}/{{CUDA_NAME}}:{{version}}

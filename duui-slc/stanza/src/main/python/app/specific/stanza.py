@@ -1,38 +1,30 @@
-import itertools
 import logging
+from typing import Self
 
-import spacy
-from app.model import DuuiResponse, Offset, UimaDependency, UimaToken
-from app.utils import (
-    EOS_MARKERS,
-    GenericModelProxy,
-    GenericPostProcessor,
-    GenericSentenceValidation,
-    TokenToId,
-)
-from spacy.language import Language
-from spacy.tokens import Doc, Span
+import stanza
+from app.abc import ModelProxyABC, ProcessorABC, SentenceValidatorABC
+from app.model import DuuiRequest, DuuiResponse, Offset, UimaDependency, UimaToken
+from app.utils import EOS_MARKERS, TokenToId
+from stanza import Pipeline
+from stanza.models.common.doc import Document, Sentence, Token, Word
+from stanza.pipeline.core import DownloadMethod
 
 logger = logging.getLogger(__name__)
 
-# model_en = "en_core_web_trf"
-model_en = "en_core_web_sm"
-# model_de = "de_dep_news_trf"
-model_de = "de_core_news_sm"
 model_map = {
-    "en": model_en,
-    "en_US": model_en,
-    "en_GB": model_en,
-    "en_AU": model_en,
-    "en_CA": model_en,
-    "de": model_de,
-    "de_DE": model_de,
-    "de_AT": model_de,
-    "de_CH": model_de,
+    "en": "en",
+    "en_US": "en",
+    "en_GB": "en",
+    "en_AU": "en",
+    "en_CA": "en",
+    "de": "de",
+    "de_DE": "de",
+    "de_AT": "de",
+    "de_CH": "de",
 }
 
 
-class SpecificModelProxy(GenericModelProxy[Language]):
+class StanzaModelProxy(ModelProxyABC[Pipeline]):
     def __init__(self):
         self.models = {}
 
@@ -40,26 +32,26 @@ class SpecificModelProxy(GenericModelProxy[Language]):
         lang = model_map.get(lang.replace("-", "_"), lang)
         if self.models.get(lang) is None:
             logger.info(f"load({lang})")
-            nlp = spacy.load(
-                lang,
-                disable=[
-                    "ner",
-                ],
+            nlp = stanza.Pipeline(
+                lang=lang,
+                processors="tokenize,mwt,pos,lemma,depparse",
+                tokenize_no_ssplit=True,
+                download_method=DownloadMethod.REUSE_RESOURCES,
             )
-            nlp.add_pipe("sentencizer")
             self.models[lang] = nlp
             logger.info(f"load({lang}): done")
         return self.models[lang]
 
 
-class SpecificSentenceValidtion(GenericSentenceValidation[Span]):
+class StanzaSentenceValidator(SentenceValidatorABC[Sentence]):
     @classmethod
-    def check(cls, sentence: Span):
+    def check(cls, sentence: Sentence):
         if not sentence.text.strip()[0].isupper():
             return cls(False)
         if sentence.text.strip()[-1] not in EOS_MARKERS:
             return cls(True, False)
-        if not any((tok.pos_ == "VERB" or tok.pos_ == "AUX" for tok in sentence)):
+        words: list[Word] = sentence.words
+        if not any((word.upos == "VERB" or word.upos == "AUX" for word in words)):
             return cls(True, True, False)
         if sentence.text.count('"') % 2 != 0:
             return cls(True, True, True, False)
@@ -68,69 +60,95 @@ class SpecificSentenceValidtion(GenericSentenceValidation[Span]):
         return cls(True, True, True, True, True)
 
 
-class SpecificPostProcessor(GenericPostProcessor[Doc]):
+class StanzaProcessor(ProcessorABC[Document]):
+    def __init__(self, proxy: StanzaModelProxy) -> None:
+        super().__init__()
+        self.proxy = proxy
+
     @classmethod
-    def process(cls, annotations: list[Doc], offsets: list[Offset]):
-        token_to_id = TokenToId()
-        results = DuuiResponse(sentences=[], tokens=[], dependencies=[])
+    def with_proxy(cls, proxy: ModelProxyABC) -> Self:
+        return cls(proxy)
+
+    def process(self, request: DuuiRequest):
+        if request.sentences is None:
+            raise ValueError("Sentences offsets are required for Stanza")
+
+        nlp = self.proxy[request.language]
+
+        annotations = []
+        offsets = request.sentences
+        for offset in offsets:
+            annotations.append(nlp(request.text[offset.begin : offset.end]))
+
+        return self.post_process(
+            annotations,
+            offsets,
+        )
+
+    @staticmethod
+    def post_process(annotations: list[Document], offsets: list[Offset]):
+        word_to_id = TokenToId()
+        results = DuuiResponse(sentences=None, tokens=[], dependencies=[])
         for doc, offset in zip(annotations, offsets):
+            logger.info(doc)  # TODO: Remove this line
+
             # Add a None to the end of the iterator to include the last sentence if it ends with a semicolon.
-            it = itertools.chain(doc.sents, (None,))
-
-            semicolon_begin = None
-            for sentence in it:
-                if sentence and sentence.text.strip().endswith(";"):
-                    semicolon_begin = semicolon_begin or sentence.start
+            for sentence in doc.sentences:
+                if not bool(StanzaSentenceValidator.check(sentence).is_standalone()):
                     continue
 
-                # If the previous sentence(s) ends with a semicolon, then the current sentence is a continuation of the previous sentence(s).
-                if semicolon_begin is not None:
-                    # If the very last sentence ended with a semicolon, we include it anyways.
-                    sentence_end = sentence and sentence.end
-                    sentence = doc[semicolon_begin:sentence_end]
+                tokens: list[Token] = sentence.tokens
+                for token in tokens:
+                    # intra_token_offset = 0
+                    # token_len = len(token.text)
+                    words: list[Word] = token.words
+                    for word in words:
+                        try:
+                            word_idx = word_to_id.add(word)
 
-                if sentence is None:
-                    continue
-
-                if bool(SpecificSentenceValidtion.check(sentence).is_standalone()):
-                    results.sentences.append(
-                        Offset(
-                            begin=sentence[0].idx + offset.begin,
-                            # add one to point to the next character after sentence end
-                            end=sentence[-1].idx + offset.begin + 1,
-                        )
-                    )
-                    for token in sentence:
-                        token_idx = token_to_id.add(token)
-
-                        begin = token.idx + offset.begin
-                        # No need to add one here: already points to the next character
-                        end = begin + len(token)
-                        results.tokens.append(
-                            UimaToken(
-                                begin=begin,
-                                end=end,
-                                pos=doc[token.i].pos_,
-                                tag=doc[token.i].tag_,
-                                lemma=doc[token.i].lemma_,
-                                morph={
-                                    k.lower(): v
-                                    for k, v in token.morph.to_dict().items()
-                                },
-                                idx=token_idx,
+                            begin = word.start_char + offset.begin
+                            end = begin + len(word.text)
+                            results.tokens.append(
+                                UimaToken(
+                                    begin=begin,
+                                    end=end,
+                                    pos=word.upos,
+                                    tag=word.xpos,
+                                    lemma=word.lemma,
+                                    morph=(
+                                        {
+                                            k.lower(): v
+                                            for k, v in (
+                                                feat.split("=")
+                                                for feat in word.feats.split("|")
+                                                if "=" in feat
+                                            )
+                                        }
+                                        if word.feats
+                                        else None
+                                    ),
+                                    idx=word_idx,
+                                )
                             )
-                        )
+                        except Exception as e:
+                            logger.error(
+                                f"Error processing word:  \n{word}\n"
+                                f"in sentence: \n{sentence}"
+                            )
+                            raise e
 
-                    for token in sentence:
-                        begin = token.idx + offset.begin
-                        end = begin + len(token)
+                for token in tokens:
+                    words: list[Word] = token.words
+                    for word in words:
+                        begin = word.start_char + offset.begin
+                        end = begin + len(word.text)
                         results.dependencies.append(
                             UimaDependency(
                                 begin=begin,
                                 end=end,
-                                governor=token_to_id[token.head],
-                                dependent=token_to_id[token],
-                                type=token.dep_.upper(),
+                                governor=word_to_id[sentence.words[word.head]],
+                                dependent=word_to_id[word],
+                                type=word.deprel.upper(),
                                 flavor="basic",
                             )
                         )

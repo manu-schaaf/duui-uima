@@ -1,14 +1,31 @@
-ARG BASE_VERSION
+ARG VERSION
 ARG CUDA_NAME="cu124"
-FROM docker.texttechnologylab.org/duui-slc-base/${CUDA_VERSION}:${BASE_VERSION}
+ARG CUDA_VERSION="12.4.1"
+
+FROM docker.texttechnologylab.org/duui-slc-base/${CUDA_NAME}:${VERSION} as base
+
+FROM ghcr.io/mamba-org/micromamba:jammy-cuda-${CUDA_VERSION} as mamba
+
+RUN micromamba install -y -n base -c conda-forge python=3.11 fastapi=0.110.3 uvicorn=0.30.1 gunicorn=22.0.0 && micromamba clean --all --yes
+
+FROM mamba as stanza
+
+ENV ANNOTATOR_NAME="duui-slc-stanza"
+ENV VERSION="${VERSION}"
 
 RUN micromamba install -y -n base -c conda-forge stanza=1.5.1 && micromamba clean --all --yes
 
+ARG MAMBA_DOCKERFILE_ACTIVATE=1
+ENV PATH=/opt/conda/bin/:$PATH
+
 RUN python -c "import stanza; stanza.download('en'); stanza.download('de'); stanza.download('fr'); "
+
+FROM stanza as app
 
 WORKDIR /duui
 
-COPY ./python/app/specific/ /duui/app/specific/
+COPY --from=base /duui /duui
+COPY ./python/app/specific/*.py /duui/app/specific/
 
 ENTRYPOINT [ "gunicorn", "wsgi:app", "-b", "0.0.0.0:9714", "-k", "uvicorn.workers.UvicornWorker" ]
 CMD [ "-w", "1" ]
