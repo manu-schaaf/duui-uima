@@ -56,11 +56,11 @@ class ErrorMessage(BaseModel):
 
 
 class UimaToken(Offset):
-    pos: str | None
-    tag: str | None
-    lemma: str | None
-    morph: dict[str, str] | None
-    idx: int | None
+    idx: int
+    pos: str | None = None
+    tag: str | None = None
+    lemma: str | None = None
+    morph: dict[str, str] | None = None
 
 
 class UimaDependency(Offset):
