@@ -62,12 +62,17 @@ def get_documentation() -> DuuiDocumentation:
         reproducible=True,
     )
 
+    annotator_name = os.environ.get("ANNOTATOR_NAME")
+    version = os.environ.get("VERSION", "0.0.1")
     documentation = DuuiDocumentation(
-        annotator_name="duui-slc-spacy",
-        version="0.0.1",
+        annotator_name=annotator_name,
+        version=version,
         implementation_lang="Python",
         meta=specific_meta,
-        docker_container_id=f"docker.texttechnologylab.org/duui-slc-spacy:{os.environ.get('VERSION', 'latest')}",
+        docker_container_id=os.environ.get(
+            "DOCKER_CONTAINER_ID",
+            f"docker.texttechnologylab.org/{annotator_name}:{version}",
+        ),
         parameters={},
         capability=capabilities,
         implementation_specific=None,
