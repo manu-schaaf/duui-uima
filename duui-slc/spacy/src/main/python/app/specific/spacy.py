@@ -130,6 +130,7 @@ class SpaCyProcessor(ProcessorABC[Doc]):
                             UimaToken(
                                 begin=begin,
                                 end=end,
+                                idx=token_idx,
                                 pos=doc[token.i].pos_,
                                 tag=doc[token.i].tag_,
                                 lemma=doc[token.i].lemma_,
@@ -137,7 +138,6 @@ class SpaCyProcessor(ProcessorABC[Doc]):
                                     k.lower(): v
                                     for k, v in token.morph.to_dict().items()
                                 },
-                                idx=token_idx,
                             )
                         )
 
@@ -150,7 +150,7 @@ class SpaCyProcessor(ProcessorABC[Doc]):
                                 end=end,
                                 governor=token_to_id[token.head],
                                 dependent=token_to_id[token],
-                                type=token.dep_.upper(),
+                                type=token.dep_.lower(),
                                 flavor="basic",
                             )
                         )

@@ -243,12 +243,12 @@ function deserialize(inputCas, inputStream)
     for i, dep in ipairs(results["dependencies"]) do
         -- Create specific annotation based on type
         local dep_anno
-        if dep["type"] == "ROOT" then
+        if string.lower(dep["type"]) == "root" or dep["type"] == "--" then
             dep_anno = luajava.newInstance("de.tudarmstadt.ukp.dkpro.core.api.syntax.type.dependency.ROOT", inputCas)
             dep_anno:setDependencyType("--")
         else
             dep_anno = luajava.newInstance("de.tudarmstadt.ukp.dkpro.core.api.syntax.type.dependency.Dependency", inputCas)
-            dep_anno:setDependencyType(dep["type"])
+            dep_anno:setDependencyType(string.lower(dep["type"]))
         end
 
         dep_anno:setBegin(dep["begin"])
@@ -256,12 +256,12 @@ function deserialize(inputCas, inputStream)
         dep_anno:setFlavor(dep["flavor"])
 
         -- Get needed tokens via indices
-        governor_token = all_tokens[dep["governor"]]
+        local governor_token = all_tokens[dep["governor"]]
         if governor_token ~= nil then
             dep_anno:setGovernor(governor_token)
         end
 
-        dependent_token = all_tokens[dep["dependent"]]
+        local dependent_token = all_tokens[dep["dependent"]]
         if governor_token ~= nil then
             dep_anno:setDependent(dependent_token)
         end
