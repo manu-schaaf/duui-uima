@@ -1,8 +1,8 @@
-ARG BASE_VERSION
+ARG VERSION
 ARG CUDA_NAME="cu124"
 ARG CUDA_VERSION="12.4.1"
 
-FROM docker.texttechnologylab.org/duui-slc-base/${CUDA_NAME}:${BASE_VERSION} as base
+FROM docker.texttechnologylab.org/duui-slc-base/${CUDA_NAME}:${VERSION} as base
 
 FROM ghcr.io/mamba-org/micromamba:jammy-cuda-${CUDA_VERSION} as mamba
 
@@ -22,6 +22,9 @@ RUN python -m spacy download en_core_web_sm \
 #     && python -m spacy download de_core_news_trf
 
 HEALTHCHECK CMD python -m spacy validate
+
+ENV ANNOTATOR_NAME="duui-slc-spacy"
+ENV VERSION="${VERSION}"
 
 FROM spacy as app
 
