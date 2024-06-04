@@ -41,7 +41,7 @@ class Offset(BaseModel):
     end: int
 
 
-class DUUIRequest(BaseModel):
+class DuuiRequest(BaseModel):
     """Request model"""
 
     text: str

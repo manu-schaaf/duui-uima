@@ -1,20 +1,20 @@
 import logging
 import os
-import sys
 import traceback
 from pathlib import Path
 from threading import Lock
+from typing import Generator
 
-import spacy
+from app.abc import ModelProxyABC
 from app.model import (
     DuuiCapability,
     DuuiDocumentation,
-    DUUIRequest,
+    DuuiRequest,
     DuuiResponse,
     ErrorMessage,
-    Offset,
 )
-from app.specific import SpecificModelProxy, SpecificPostProcessor
+from app.specific import SpecificModelProxy, SpecificProcessor
+from app.specific import __meta__ as specific_meta
 from fastapi import APIRouter, Depends, Response
 from fastapi.responses import JSONResponse, PlainTextResponse
 
@@ -66,10 +66,7 @@ def get_documentation() -> DuuiDocumentation:
         annotator_name="duui-slc-spacy",
         version="0.0.1",
         implementation_lang="Python",
-        meta={
-            "sys.version": sys.version,
-            "spacy.__version__": spacy.__version__,
-        },
+        meta=specific_meta,
         docker_container_id=f"docker.texttechnologylab.org/duui-slc-spacy:{os.environ.get('VERSION', 'latest')}",
         parameters={},
         capability=capabilities,
@@ -81,10 +78,10 @@ def get_documentation() -> DuuiDocumentation:
 
 lock = Lock()
 
-_model_proxy = SpecificModelProxy()
+_model_proxy: ModelProxyABC = SpecificModelProxy()
 
 
-def get_pipeline():
+def get_proxy() -> Generator[ModelProxyABC, None, None]:
     lock.acquire()
     try:
         yield _model_proxy
@@ -104,29 +101,12 @@ def get_pipeline():
     tags=["DUUI"],
 )
 async def v1_process(
-    request: DUUIRequest,
-    models=Depends(get_pipeline),  # noqa: B008
+    request: DuuiRequest,
+    proxy=Depends(get_proxy),  # noqa: B008
 ):
     logger.info(request)
-    nlp = models[request.language]
     try:
-        offsets = request.sentences or request.paragraphs
-        if offsets:
-            logger.info(f"Processing {len(offsets)} spans")
-            annotations = []
-            for offset in offsets:
-                logger.info(f"Processing span {offset.begin} - {offset.end}")
-                annotations.append(nlp(request.text[offset.begin : offset.end]))
-        else:
-            annotations = [nlp(request.text)]
-            offsets = [Offset(begin=0, end=0)]
-
-        results = SpecificPostProcessor.process(
-            annotations,
-            offsets,
-        )
-
-        return results
+        return SpecificProcessor.with_proxy(proxy).process(request)
     except Exception as e:
         logger.error(f"Error in v1_process: {e}\n{traceback.format_exc()}")
         return JSONResponse(

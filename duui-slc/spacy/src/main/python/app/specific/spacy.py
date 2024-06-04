@@ -1,15 +1,11 @@
 import itertools
 import logging
+from typing import Self
 
 import spacy
-from app.model import DuuiResponse, Offset, UimaDependency, UimaToken
-from app.utils import (
-    EOS_MARKERS,
-    GenericModelProxy,
-    GenericPostProcessor,
-    GenericSentenceValidation,
-    TokenToId,
-)
+from app.abc import ModelProxyABC, ProcessorABC, SentenceValidatorABC
+from app.model import DuuiRequest, DuuiResponse, Offset, UimaDependency, UimaToken
+from app.utils import EOS_MARKERS, TokenToId
 from spacy.language import Language
 from spacy.tokens import Doc, Span
 
@@ -32,7 +28,7 @@ model_map = {
 }
 
 
-class SpecificModelProxy(GenericModelProxy[Language]):
+class SpaCyModelProxy(ModelProxyABC[Language]):
     def __init__(self):
         self.models = {}
 
@@ -52,7 +48,7 @@ class SpecificModelProxy(GenericModelProxy[Language]):
         return self.models[lang]
 
 
-class SpecificSentenceValidtion(GenericSentenceValidation[Span]):
+class SpaCySentenceValidator(SentenceValidatorABC[Span]):
     @classmethod
     def check(cls, sentence: Span):
         if not sentence.text.strip()[0].isupper():
@@ -68,9 +64,33 @@ class SpecificSentenceValidtion(GenericSentenceValidation[Span]):
         return cls(True, True, True, True, True)
 
 
-class SpecificPostProcessor(GenericPostProcessor[Doc]):
+class SpaCyProcessor(ProcessorABC[Doc]):
+    def __init__(self, proxy: SpaCyModelProxy) -> None:
+        super().__init__()
+        self.proxy = proxy
+
     @classmethod
-    def process(cls, annotations: list[Doc], offsets: list[Offset]):
+    def with_proxy(cls, proxy: ModelProxyABC) -> Self:
+        return cls(proxy)
+
+    def process(self, request: DuuiRequest):
+        nlp = self.proxy[request.language]
+        offsets = request.sentences or request.paragraphs
+        if offsets:
+            annotations = []
+            for offset in offsets:
+                annotations.append(nlp(request.text[offset.begin : offset.end]))
+        else:
+            annotations = [nlp(request.text)]
+            offsets = [Offset(begin=0, end=0)]
+
+        return self.post_process(
+            annotations,
+            offsets,
+        )
+
+    @staticmethod
+    def post_process(annotations: list[Doc], offsets: list[Offset]):
         token_to_id = TokenToId()
         results = DuuiResponse(sentences=[], tokens=[], dependencies=[])
         for doc, offset in zip(annotations, offsets):
@@ -92,7 +112,7 @@ class SpecificPostProcessor(GenericPostProcessor[Doc]):
                 if sentence is None:
                     continue
 
-                if bool(SpecificSentenceValidtion.check(sentence).is_standalone()):
+                if bool(SpaCySentenceValidator.check(sentence).is_standalone()):
                     results.sentences.append(
                         Offset(
                             begin=sentence[0].idx + offset.begin,
