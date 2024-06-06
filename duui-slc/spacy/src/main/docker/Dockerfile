@@ -40,5 +40,5 @@ HEALTHCHECK --interval=30s --timeout=5s \
         --data '{"text": "This is the first example. And this is the second one.", "language": "en"}' \
         localhost:9714/v1/process || exit 1
 
-ENTRYPOINT [ "gunicorn", "wsgi:app", "-b", "0.0.0.0:9714", "-k", "uvicorn.workers.UvicornWorker" ]
+ENTRYPOINT [ "gunicorn", "wsgi:app", "-b", "0.0.0.0:9714", "-k", "uvicorn.workers.UvicornWorker", "--timeout", "3600" ]
 CMD [ "-w", "1" ]
