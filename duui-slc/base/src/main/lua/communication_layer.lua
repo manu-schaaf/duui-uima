@@ -30,9 +30,9 @@ function serialize(inputCas, outputStream, parameters)
 
     local sentences = {}
     local counter = 1
-    local it = JCasUtil:select(inputCas, Sentence):iterator()
-    while it:hasNext() do
-        local annotation = it:next()
+    local it_sentences = JCasUtil:select(inputCas, Sentence):iterator()
+    while it_sentences:hasNext() do
+        local annotation = it_sentences:next()
         local annotation_begin = annotation:getBegin()
         local annotation_end = annotation:getEnd()
         sentences[counter] = {}
@@ -43,9 +43,9 @@ function serialize(inputCas, outputStream, parameters)
 
     local paragraphs = {}
     counter = 1
-    it = JCasUtil:select(inputCas, Sentence):iterator()
-    while it:hasNext() do
-        local annotation = it:next()
+    local it_paragraphs = JCasUtil:select(inputCas, Paragraph):iterator()
+    while it_paragraphs:hasNext() do
+        local annotation = it_paragraphs:next()
         local annotation_begin = annotation:getBegin()
         local annotation_end = annotation:getEnd()
         paragraphs[counter] = {}
@@ -122,27 +122,6 @@ function deserialize(inputCas, inputStream)
         end
 
         all_tokens[token["idx"]] = token_anno
-
-        -- TODO: remove -- URL detection
-        -- if token["like_url"] then
-        --     url_anno = luajava.newInstance("org.texttechnologylab.type.id.URL", inputCas)
-        --     url_anno:setBegin(token["begin"])
-        --     url_anno:setEnd(token["end"])
-
-        --     -- optional url might be split in parts
-        --     if token["url_parts"] ~= nil then
-        --         url_anno:setScheme(token["url_parts"]["scheme"])
-        --         url_anno:setUser(token["url_parts"]["user"])
-        --         url_anno:setPassword(token["url_parts"]["password"])
-        --         url_anno:setHost(token["url_parts"]["host"])
-        --         url_anno:setPort(token["url_parts"]["port"])
-        --         url_anno:setPath(token["url_parts"]["path"])
-        --         url_anno:setQuery(token["url_parts"]["query"])
-        --         url_anno:setFragment(token["url_parts"]["fragment"])
-        --     end
-        --     url_anno:addToIndexes()
-        -- end
-
 
         if token["lemma"] ~= nil then
             local lemma_anno = luajava.newInstance("de.tudarmstadt.ukp.dkpro.core.api.segmentation.type.Lemma", inputCas)

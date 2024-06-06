@@ -109,7 +109,6 @@ async def v1_process(
     request: DuuiRequest,
     proxy=Depends(get_proxy),  # noqa: B008
 ):
-    logger.info(request)
     try:
         return SpecificProcessor.with_proxy(proxy).process(request)
     except Exception as e:

@@ -35,7 +35,7 @@ class SpaCyModelProxy(ModelProxyABC[Language]):
     def __getitem__(self, lang: str):
         lang = model_map.get(lang.replace("-", "_"), lang)
         if self.models.get(lang) is None:
-            logger.info(f"load({lang})")
+            logger.debug(f"load({lang})")
             nlp = spacy.load(
                 lang,
                 disable=[
@@ -44,7 +44,7 @@ class SpaCyModelProxy(ModelProxyABC[Language]):
             )
             nlp.add_pipe("sentencizer")
             self.models[lang] = nlp
-            logger.info(f"load({lang}): done")
+            logger.debug(f"load({lang}): done")
         return self.models[lang]
 
 
