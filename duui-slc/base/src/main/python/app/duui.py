@@ -13,9 +13,9 @@ from app.model import (
     DuuiResponse,
     ErrorMessage,
 )
-from app.specific import SpecificModelProxy, SpecificProcessor
-from app.specific import __meta__ as specific_meta
-from fastapi import APIRouter, Depends, Response
+from app.parser import ParserProxy, DependencyParser
+from app.parser import __meta__ as parser_meta
+from fastapi import Depends, FastAPI, Request, Response
 from fastapi.responses import JSONResponse, PlainTextResponse
 
 v1_api = APIRouter()
@@ -68,7 +68,7 @@ def get_documentation() -> DuuiDocumentation:
         annotator_name=annotator_name,
         version=version,
         implementation_lang="Python",
-        meta=specific_meta,
+        meta=parser_meta,
         docker_container_id=os.environ.get(
             "DOCKER_CONTAINER_ID",
             f"docker.texttechnologylab.org/{annotator_name}:{version}",
@@ -83,7 +83,7 @@ def get_documentation() -> DuuiDocumentation:
 
 lock = Lock()
 
-_model_proxy: ModelProxyABC = SpecificModelProxy()
+_model_proxy: ModelProxyABC = ParserProxy()
 
 
 def get_proxy() -> Generator[ModelProxyABC, None, None]:
@@ -110,7 +110,7 @@ async def v1_process(
     proxy=Depends(get_proxy),  # noqa: B008
 ):
     try:
-        return SpecificProcessor.with_proxy(proxy).process(request)
+        return DependencyParser.with_proxy(proxy).process(request)
     except Exception as e:
         logger.error(f"Error in v1_process: {e}\n{traceback.format_exc()}")
         return JSONResponse(

@@ -9,7 +9,7 @@ __meta__: Final[dict[str, str]] = {
 }
 
 
-class SpecificModelProxy(ModelProxyABC):
+class ParserProxy(ModelProxyABC):
     pass
 
 
@@ -17,12 +17,12 @@ class SpecificSentenceValidator(SentenceValidatorABC):
     pass
 
 
-class SpecificProcessor(ProcessorABC):
+class DependencyParser(ProcessorABC):
     pass
 
 
 __all__ = [
-    "SpecificModelProxy",
+    "ParserProxy",
     "SpecificSentenceValidator",
-    "SpecificProcessor",
+    "DependencyParser",
 ]
