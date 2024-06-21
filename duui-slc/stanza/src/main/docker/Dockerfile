@@ -26,7 +26,7 @@ FROM stanza as app
 WORKDIR /duui
 
 COPY --from=base /duui /duui
-COPY ./python/app/specific/*.py /duui/app/specific/
+COPY ./python/app/parser/*.py /duui/app/parser/
 
 
 HEALTHCHECK --interval=30s --timeout=5s \

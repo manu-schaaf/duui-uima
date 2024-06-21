@@ -10,6 +10,6 @@ COPY ./lua/communication_layer.lua /duui/communication_layer.lua
 COPY ./resources/dkpro-core-types.xml /duui/dkpro-core-types.xml
 COPY ./python/wsgi.py /duui/wsgi.py
 COPY ./python/app/*.py /duui/app/
-COPY ./python/app/specific/*.py /duui/app/specific/
+COPY ./python/app/parser/*.py /duui/app/parser/
 
 ENTRYPOINT ["/usr/local/bin/_entrypoint.sh"]
