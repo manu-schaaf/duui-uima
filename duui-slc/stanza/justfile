@@ -3,8 +3,8 @@ set allow-duplicate-variables := true
 
 import? '../base/justfile'
 
-export CUDA_NAME := "cu124"
-export CUDA_VERSION := "12.4.1"
+export CUDA_NAME := "cu121"
+export CUDA_VERSION := "12.1.1"
 
 export VERSION := "0.3.1"
 
