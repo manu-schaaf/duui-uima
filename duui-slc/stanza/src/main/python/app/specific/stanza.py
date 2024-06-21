@@ -3,6 +3,7 @@ import logging
 from typing import Self
 
 import stanza
+import torch
 from app.abc import ModelProxyABC, ProcessorABC, SentenceValidatorABC
 from app.model import DuuiRequest, DuuiResponse, Offset, UimaDependency, UimaToken
 from app.utils import EOS_MARKERS, TokenToId
@@ -32,15 +33,15 @@ class StanzaModelProxy(ModelProxyABC[Pipeline]):
     def __getitem__(self, lang: str):
         lang = model_map.get(lang.replace("-", "_"), lang)
         if self.models.get(lang) is None:
-            logger.debug(f"load({lang})")
+            logger.info(f"stanza.load('{lang}')")
             nlp = stanza.Pipeline(
                 lang=lang,
                 processors="tokenize,mwt,pos,lemma,depparse",
                 tokenize_no_ssplit=True,
                 download_method=DownloadMethod.REUSE_RESOURCES,
+                device="cuda:0" if torch.cuda.is_available() else None,
             )
             self.models[lang] = nlp
-            logger.debug(f"load({lang}): done")
         return self.models[lang]
 
 
