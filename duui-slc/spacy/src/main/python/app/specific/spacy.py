@@ -35,7 +35,8 @@ class SpaCyModelProxy(ModelProxyABC[Language]):
     def __getitem__(self, lang: str):
         lang = model_map.get(lang.replace("-", "_"), lang)
         if self.models.get(lang) is None:
-            logger.debug(f"load({lang})")
+            logger.info(f"spacy.load('{lang}')")
+            device = "cuda" if spacy.prefer_gpu() else "cpu"
             nlp = spacy.load(
                 lang,
                 disable=[
@@ -43,8 +44,11 @@ class SpaCyModelProxy(ModelProxyABC[Language]):
                 ],
             )
             nlp.add_pipe("sentencizer")
+            logger.info(
+                f"spacy: loaded\npipeline({device})\n  "
+                + "\n  ".join(nlp.component_names)
+            )
             self.models[lang] = nlp
-            logger.debug(f"load({lang}): done")
         return self.models[lang]
 
 
