@@ -7,14 +7,9 @@ from __future__ import annotations
 import os
 
 import uvicorn
-from app.duui import v1_api as duui_v1_api
-from fastapi import FastAPI
+from app.duui import v1_api as app
 
-
-app = FastAPI()
-# DUUI v1 interface
-app.include_router(duui_v1_api)
-
+__all__ = ["app"]
 
 if __name__ == "__main__":
     uvicorn.run(

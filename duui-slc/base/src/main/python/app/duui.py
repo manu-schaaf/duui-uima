@@ -18,9 +18,9 @@ from app.parser import __meta__ as parser_meta
 from fastapi import Depends, FastAPI, Request, Response
 from fastapi.responses import JSONResponse, PlainTextResponse
 
-v1_api = APIRouter()
-
 logger = logging.getLogger(__name__)
+
+v1_api = FastAPI()
 
 
 lua_path = Path(os.environ.get("COMMUNICATION_LAYER_PATH", "communication_layer.lua"))
