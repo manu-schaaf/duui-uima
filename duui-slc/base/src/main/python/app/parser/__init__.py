@@ -13,7 +13,7 @@ class ParserProxy(ModelProxyABC):
     pass
 
 
-class SpecificSentenceValidator(SentenceValidatorABC):
+class SentenceValidator(SentenceValidatorABC):
     pass
 
 
@@ -23,6 +23,6 @@ class DependencyParser(ProcessorABC):
 
 __all__ = [
     "ParserProxy",
-    "SpecificSentenceValidator",
+    "SentenceValidator",
     "DependencyParser",
 ]
