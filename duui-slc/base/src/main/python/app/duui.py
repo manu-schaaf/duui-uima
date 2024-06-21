@@ -1,5 +1,6 @@
 import logging
 import os
+import time
 import traceback
 from pathlib import Path
 from threading import Lock
@@ -21,6 +22,16 @@ from fastapi.responses import JSONResponse, PlainTextResponse
 logger = logging.getLogger(__name__)
 
 v1_api = FastAPI()
+
+
+@v1_api.middleware("http")
+async def add_process_time_header(request: Request, call_next):
+    start_time = time.time()
+    response = await call_next(request)
+    process_time = time.time() - start_time
+    response.headers["X-Process-Time"] = str(process_time)
+    logger.info(f"{request.url.path}: {process_time*1000:0.0f}ms")
+    return response
 
 
 lua_path = Path(os.environ.get("COMMUNICATION_LAYER_PATH", "communication_layer.lua"))
