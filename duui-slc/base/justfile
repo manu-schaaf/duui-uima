@@ -7,7 +7,7 @@ export REPOSITORY := "docker.texttechnologylab.org"
 
 base version=VERSION:
     docker build \
-        --build-arg CUDA_VERSION="12.4.1" \
+        --build-arg CUDA_VERSION="{{CUDA_VERSION}}" \
         -t {{REPOSITORY}}/duui-slc-base/{{CUDA_NAME}}:{{version}} \
         -f ../base/src/main/docker/Dockerfile ../base/src/main/
 
