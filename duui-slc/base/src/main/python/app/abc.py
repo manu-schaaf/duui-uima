@@ -1,7 +1,7 @@
 import logging
 from abc import abstractmethod
 from dataclasses import dataclass
-from typing import Callable, Generic, Self, TypeVar
+from typing import Callable, Final, Generic, Self, TypeVar
 
 from app.model import DuuiRequest, DuuiResponse, Offset
 
@@ -77,3 +77,6 @@ class ProcessorABC(Generic[NlpAnnotation]):
         offsets: list[Offset],
     ) -> DuuiResponse:
         pass
+
+
+EOS_MARKERS: Final[set[str]] = set(".?!")
