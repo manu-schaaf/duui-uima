@@ -8,9 +8,9 @@ __meta__ = {
 }
 
 
-from app.parser.stanza import StanzaModelProxy as ParserProxy
-from app.parser.stanza import StanzaProcessor as DependencyParser
-from app.parser.stanza import StanzaSentenceValidator as SentenceValidator
+from app.parser.stanza_ import StanzaModelProxy as ParserProxy
+from app.parser.stanza_ import StanzaProcessor as DependencyParser
+from app.parser.stanza_ import StanzaSentenceValidator as SentenceValidator
 
 __all__ = [
     "ParserProxy",

@@ -8,9 +8,9 @@ __meta__ = {
 }
 
 
-from app.parser.spacy import SpaCyModelProxy as ParserProxy
-from app.parser.spacy import SpaCyProcessor as DependencyParser
-from app.parser.spacy import SpaCySentenceValidator as SentenceValidator
+from app.parser.spacy_ import SpaCyModelProxy as ParserProxy
+from app.parser.spacy_ import SpaCyProcessor as DependencyParser
+from app.parser.spacy_ import SpaCySentenceValidator as SentenceValidator
 
 __all__ = [
     "ParserProxy",
