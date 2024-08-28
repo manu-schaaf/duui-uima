@@ -1,0 +1,18 @@
+Add the Biaffine models to this directory
+
+Naming convention:
+models/biaffine/{language-code}/<Model_Files>
+
+Example Structure:
+
+models/
+└── biaffine/
+    ├── en/           # English language code
+    │   ├── model.pt
+    │   └── config.yaml
+    ├── de/           # German language code
+    │   ├── model.pt
+    │   └── config.yaml
+    ├── es/           # Spanish language code
+    │   ├── model.pt
+    │   └── config.yaml

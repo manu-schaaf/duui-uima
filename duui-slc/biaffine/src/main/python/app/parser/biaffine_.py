@@ -33,29 +33,29 @@ model_map = {
 
 POS_VERBS: Final = {"VERB", "AUX"}
 
-class CRF2oModelProxy(ModelProxyABC[Language]):
+class BiaffineModelProxy(ModelProxyABC[Language]):
     def __init__(self):
         self.models = {}
 
     def __getitem__(self, lang: str):
         lang = model_map.get(lang.replace("-", "_"), lang)
         if self.models.get(lang) is None:
-            logger.info(f"CRF2o: Initiate a dependency parser for '{lang}'")
+            logger.info(f"Biaffine: Initiate a dependency parser for '{lang}'")
             nlp = Parser.load(
-                f'./app/parser/models/crf2o/{lang}/model.pt'
+                f'./app/parser/models/biaffine/{lang}/model.pt'
             )
             logger.info(
-                f"CRF2o: Loaded a Dependency Parser ({lang})\nModel Name: {nlp.NAME}"
+                f"Biaffine: Loaded a Dependency Parser ({lang})\nModel Name: {nlp.NAME}"
             )
             
-            logger.info(f"CRF2o: Initiate a stanza preprocessing pipeline for '{lang}'")
+            logger.info(f"Biaffine: Initiate a stanza preprocessing pipeline for '{lang}'")
             preprocessor = Pipeline(
                 lang=lang,
                 processors='tokenize,pos,lemma',
                 tokenize_no_ssplit=True
             )
             logger.info(
-                f"CRF2o: Loaded a stanza preprocessing pipeline ({lang})\n"
+                f"Biaffine: Loaded a stanza preprocessing pipeline ({lang})\n"
             )
             
             self.models[lang] = {
@@ -65,29 +65,29 @@ class CRF2oModelProxy(ModelProxyABC[Language]):
             
         return self.models[lang]
 
-class CRF2oSentenceValidator(SentenceValidatorABC[CoNLLSentence]):
+class BiaffineSentenceValidator(SentenceValidatorABC[CoNLLSentence]):
     @classmethod
     def check(cls, sentence: CoNLLSentence):
         if not sentence.words[0][0].isupper():
-            logger.info("CRF2o: Sentence does not start with a capitalized character")
+            logger.info("Biaffine: Sentence does not start with a capitalized character")
             return cls(False)
         if sentence.words[-1][-1] not in EOS_MARKERS:
-            logger.info("CRF2o: Sentence does not end with a period, question mark, or exclamation mark")
+            logger.info("Biaffine: Sentence does not end with a period, question mark, or exclamation mark")
             return cls(True, False)
         if not any(pos in POS_VERBS for pos in sentence.upos):
             logger.info("CoreNLP: Sentence does not contain a verb")
             return cls(True, True, False)
         if ' '.join(sentence.words).count('"') % 2 != 0:
-            logger.info("CRF2o: The number of quotation marks is not even")
+            logger.info("Biaffine: The number of quotation marks is not even")
             return cls(True, True, True, False)
         if ' '.join(sentence.words).count("(") != ' '.join(sentence.words).count(")"):
-            logger.info("CRF2o: The number of left brackets is not equal to that of right brackets")
+            logger.info("Biaffine: The number of left brackets is not equal to that of right brackets")
             return cls(True, True, True, True, False)
         
         return cls(True, True, True, True, True)
 
-class CRF2oProcessor(ProcessorABC[Dataset]):
-    def __init__(self, proxy: CRF2oModelProxy) -> None:
+class BiaffineProcessor(ProcessorABC[Dataset]):
+    def __init__(self, proxy: BiaffineModelProxy) -> None:
         super().__init__()
         self.proxy = proxy
 
@@ -97,7 +97,7 @@ class CRF2oProcessor(ProcessorABC[Dataset]):
 
     def process(self, request: DuuiRequest):
         if request.sentences is None:
-            raise ValueError("Sentences offsets are required for CRF2o")
+            raise ValueError("Sentences offsets are required for Biaffine")
 
         nlp = self.proxy[request.language]['parser']
         preprocessor = self.proxy[request.language]['preprocessor']
@@ -108,8 +108,8 @@ class CRF2oProcessor(ProcessorABC[Dataset]):
             document: Document = preprocessor(request.text[offset.begin : offset.end])
             annotation: CoNLLSentence = nlp.predict(
                     [word.text for word in document.sentences[0].words], 
-                    lang=None, 
-                    prob=False, 
+                    lang=None,
+                    prob=False,
                     verbose=False
                     )[0]
             annotation.upos = [word.upos for word in document.sentences[0].words]
@@ -133,8 +133,8 @@ class CRF2oProcessor(ProcessorABC[Dataset]):
         tokens_indices = 0
         for annotation, offset in zip(annotations, offsets):
             
-            if not bool(CRF2oSentenceValidator.check(annotation).is_standalone()):
-                logger.info("CRF2o: Sentence is not standalone. Skipping.")
+            if not bool(BiaffineSentenceValidator.check(annotation).is_standalone()):
+                logger.info("Biaffine: Sentence is not standalone. Skipping.")
                 continue
                         
             sentence_begin_index = tokens_indices
