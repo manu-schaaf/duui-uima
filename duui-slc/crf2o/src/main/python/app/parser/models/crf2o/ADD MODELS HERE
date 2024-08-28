@@ -1,0 +1,18 @@
+Add the CRF2o models to this directory
+
+Naming convention:
+models/crf2o/{language-code}/<Model_Files>
+
+Example Structure:
+
+models/
+└── crf2o/
+    ├── en/           # English language code
+    │   ├── model.pt
+    │   └── config.yaml
+    ├── de/           # German language code
+    │   ├── model.pt
+    │   └── config.yaml
+    ├── es/           # Spanish language code
+    │   ├── model.pt
+    │   └── config.yaml
