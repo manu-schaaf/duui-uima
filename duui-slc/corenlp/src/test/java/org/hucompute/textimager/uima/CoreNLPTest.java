@@ -26,11 +26,23 @@ import org.texttechnologylab.DockerUnifiedUIMAInterface.lua.DUUILuaContext;
 import org.xml.sax.SAXException;
 
 import java.io.ByteArrayOutputStream;
+import java.io.File;
+import java.io.FileInputStream;
 import java.io.IOException;
 import java.net.URISyntaxException;
 import java.net.UnknownHostException;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.DirectoryStream;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.List;
 import java.util.Objects;
+
+import org.apache.commons.io.IOUtils;
 
 public class CoreNLPTest {
     static DUUIComposer composer;
@@ -48,7 +60,7 @@ public class CoreNLPTest {
         
         composer.addDriver(new DUUIDockerDriver().withTimeout(10000));
         composer.add(
-                new DUUIDockerDriver.Component("duui-slc-corenlp/cu124:0.0.1"));
+                new DUUIDockerDriver.Component("docker.texttechnologylab.org/duui-slc-corenlp/cu124:0.0.1"));
         
         cas = JCasFactory.createJCas();
 
@@ -170,4 +182,6 @@ public class CoreNLPTest {
         System.out.println("Test dependencyParsingCoreNLPTestEn Passed!");
 
     }
+
+
 }
