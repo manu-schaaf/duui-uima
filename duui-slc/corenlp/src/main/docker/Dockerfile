@@ -14,10 +14,11 @@ FROM mamba as corenlp
 USER root
 RUN apt-get update && apt-get install -y openjdk-17-jdk && apt-get clean
 
-RUN micromamba install -y -n base -c conda-forge stanza=1.8.2 && micromamba clean --all --yes
-
 ARG MAMBA_DOCKERFILE_ACTIVATE=1
 ENV PATH=/opt/conda/bin/:$PATH
+
+RUN micromamba install -y -n base -c conda-forge stanza=1.8.2 && micromamba clean --all --yes
+RUN pip install dkpro-cassis==0.9.1
 
 RUN python -c "import stanza; stanza.install_corenlp(); stanza.download_corenlp_models(model='german', version='4.5.7');"
 

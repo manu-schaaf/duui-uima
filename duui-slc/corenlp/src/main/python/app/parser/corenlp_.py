@@ -6,6 +6,8 @@ from app.model import DuuiRequest, DuuiResponse, Offset, UimaDependency, UimaTok
 from app.utils import EOS_MARKERS
 from stanza.server import CoreNLPClient
 
+from cassis.cas import Utf16CodepointOffsetConverter
+
 import socket
 
 logger = logging.getLogger(__name__)
@@ -95,8 +97,25 @@ class CoreNLPProcessor(ProcessorABC[CoreNLPDocument]):
 
         annotations = []
         offsets = request.sentences
+        text = request.text
+        
+        # Encode text to utf-16 to handle surrogate pairs
+        # and create offset mapping for utf-16 text
+        text_utf16 = text.encode('utf-16', 'surrogatepass').decode('utf-16', 'surrogateescape')
+        converter = Utf16CodepointOffsetConverter()
+        converter.create_offset_mapping(text_utf16)
+        adjusted_offsets = []
         for offset in offsets:
-            annotations.append(nlp.annotate(request.text[offset.begin : offset.end], properties={'ssplit.isOneSentence': 'true'}))
+            new_begin = converter.external_to_python(offset.begin)
+            new_end = converter.external_to_python(offset.end)
+            adjusted_offsets.append(Offset(begin=new_begin, end=new_end))
+        
+        for offset in adjusted_offsets:
+            try:
+                annotations.append(nlp.annotate(text_utf16[offset.begin : offset.end], properties={'ssplit.isOneSentence': 'true'}))
+                logger.info(f"CoreNLP: Processed a sentence 1: {text_utf16[offset.begin : offset.end]}")
+            except Exception as e:
+                logger.error(f"CoreNLP Parsing Error: {e}")
 
         return self.post_process(
             annotations,
