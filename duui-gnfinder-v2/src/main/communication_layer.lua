@@ -36,6 +36,11 @@ function serialize(inputCas, outputStream, parameters)
         sources = decode_sources(parameters.sources or "[11]"),
         allMatches = parameters.allMatches == "true",
     }
+    -- the verification switch is overriden by any given sources,
+    -- so we force them to nil if it is disabled
+    if not params.verification then
+        params.sources = nil
+    end
 
     local lang = inputCas:getDocumentLanguage()
     if lang ~= nil then
