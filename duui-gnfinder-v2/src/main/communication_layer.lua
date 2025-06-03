@@ -44,10 +44,10 @@ function serialize(inputCas, outputStream, parameters)
 
     local lang = inputCas:getDocumentLanguage()
     if lang ~= nil then
-        if lang:lower():sub(2) == "de" then
-            params["language"] = "deu"
-        elseif lang:lower():sub(2) then
-            params["language"] = "eng"
+        if lang:sub(2):lower() == "de" then
+            params.language = "deu"
+        elseif lang:sub(2):lower() == "en" then
+            params.language = "eng"
         end
     end
 
