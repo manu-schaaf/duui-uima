@@ -553,7 +553,7 @@ class FinderName(BaseModel):
         ]
     ] = None
 
-    verification: Optional[FinderVerification]
+    verification: Optional[FinderVerification] = None
 
 
 class FinderResult(BaseModel):
