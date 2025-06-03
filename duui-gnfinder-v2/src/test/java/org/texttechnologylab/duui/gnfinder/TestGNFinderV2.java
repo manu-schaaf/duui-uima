@@ -14,6 +14,8 @@ import org.texttechnologylab.annotation.biofid.gnfinder.MetaData;
 import org.texttechnologylab.annotation.biofid.gnfinder.Taxon;
 
 public class TestGNFinderV2 {
+    final static String DOCKER_IMAGE = "docker.texttechnologylab.org/duui-gnfinder-v2:0.1.4";
+
     private static JCas getJCas() throws ResourceInitializationException, CASException {
         JCas jCas = JCasFactory.createJCas();
         jCas.setDocumentText(
@@ -32,7 +34,7 @@ public class TestGNFinderV2 {
 
         composer.addDriver(new DUUIDockerDriver(10000));
         composer.add(
-                new DUUIDockerDriver.Component("docker.texttechnologylab.org/duui-gnfinder-v2:0.1.3")
+                new DUUIDockerDriver.Component(DOCKER_IMAGE)
                         .build()
         );
 
@@ -53,7 +55,7 @@ public class TestGNFinderV2 {
 
         composer.addDriver(new DUUIDockerDriver(10000));
         composer.add(
-                new DUUIDockerDriver.Component("docker.texttechnologylab.org/duui-gnfinder-v2:0.1.3")
+                new DUUIDockerDriver.Component(DOCKER_IMAGE)
                         .withParameter("noBayes", "true")
                         .build()
         );
@@ -75,7 +77,7 @@ public class TestGNFinderV2 {
 
         composer.addDriver(new DUUIDockerDriver(10000));
         composer.add(
-                new DUUIDockerDriver.Component("docker.texttechnologylab.org/duui-gnfinder-v2:0.1.3")
+                new DUUIDockerDriver.Component(DOCKER_IMAGE)
                         .withParameter("allMatches", "true")
                         // Catalogue of Life and GBIF
                         .withParameter("sources", "[1, 11]")
@@ -99,8 +101,30 @@ public class TestGNFinderV2 {
 
         composer.addDriver(new DUUIDockerDriver(10000));
         composer.add(
-                new DUUIDockerDriver.Component("docker.texttechnologylab.org/duui-gnfinder-v2:0.1.3")
+                new DUUIDockerDriver.Component(DOCKER_IMAGE)
                         .withParameter("oddsDetails", "true")
+                        .build()
+        );
+
+        JCas jCas = getJCas();
+        composer.run(jCas);
+        composer.shutdown();
+
+        printResults(jCas);
+    }
+
+    @Test
+    public void test_wo_verification() throws Exception {
+        DUUIComposer composer = new DUUIComposer()
+                .withLuaContext(
+                        new DUUILuaContext()
+                                .withJsonLibrary())
+                .withSkipVerification(true);
+
+        composer.addDriver(new DUUIDockerDriver(10000));
+        composer.add(
+                new DUUIDockerDriver.Component(DOCKER_IMAGE)
+                        .withParameter("verification", "false")
                         .build()
         );
 
