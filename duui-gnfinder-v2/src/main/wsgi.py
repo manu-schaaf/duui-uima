@@ -598,7 +598,7 @@ class TaxonVerifiedType(TaxonType):
         return cls(
             begin=name.start,
             end=name.offsetEnd if name.offsetEnd else name.start + len(name.verbatim),
-            value=data.currentCanonicalSimple,
+            value=name.name,
             identifier=data.outlink if data.outlink else data.recordId,
             cardinality=name.cardinality,
             oddsLog10=name.oddsLog10,
@@ -677,7 +677,7 @@ async def v1_process(
                         TaxonVerifiedType.from_finder(name=name, data=result)
                     )
             else:
-                result = name.verification.bestResult
+                result: FinderResultData = name.verification.bestResult  # type: ignore
                 results.append(TaxonVerifiedType.from_finder(name=name, data=result))
         else:
             results.append(
@@ -689,7 +689,7 @@ async def v1_process(
                         else name.start + len(name.verbatim)
                     ),
                     value=name.name,
-                    identifier=name.verbatim,
+                    identifier="",
                     cardinality=name.cardinality,
                     oddsLog10=name.oddsLog10,
                     oddsDetails=name.oddsDetails,
