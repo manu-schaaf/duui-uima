@@ -3,6 +3,7 @@ from typing import Optional
 import spacy
 from fastapi.datastructures import State
 from fastapi.logger import logger
+from spacy import Language  # type: ignore
 
 from duui.const import SpacyModelName
 from duui.models import SpacySettings
@@ -12,13 +13,22 @@ from duui.settings import SETTINGS
 def load_spacy_model(
     settings: SpacySettings,
     model_name: Optional[SpacyModelName] = None,
-) -> spacy.Language:
-    return spacy.load(
+) -> Language:
+    if settings.spacy_require_gpu:
+        on_gpu = spacy.require_gpu()
+    else:
+        on_gpu = spacy.prefer_gpu()
+
+    model = spacy.load(
         model_name or settings.resolve_model(),
         exclude=settings.spacy_exclude
         if settings.spacy_exclude is not None
         else SETTINGS.spacy_exclude,
     )
+
+    logger.info(f"Loaded spaCy model: {model_name} on {'GPU' if on_gpu else 'CPU'}")
+
+    return model
 
 
 def get_spacy_model(state: State, settings: SpacySettings):
@@ -35,7 +45,6 @@ def get_spacy_model(state: State, settings: SpacySettings):
             )
             del state.models[oldest_model_name]
 
-        logger.info(f"Loading spaCy model: {model_name}")
         model = load_spacy_model(settings, model_name)
         state.models[model_name] = model
         state.lru.insert(0, model_name)

@@ -1,4 +1,15 @@
+from sys import version
 from typing import Final, Literal
+
+import spacy
+
+SYS_VERSION: Final[str] = version
+
+try:
+    spacy_version = spacy.__version__  # type: ignore
+except Exception:
+    spacy_version = "unknown"
+SPACY_VERSION: Final[str] = spacy_version
 
 SpacyModelName = Literal[
     "ca_core_news_lg",
@@ -220,7 +231,7 @@ SPACY_LOOKUP: Final[dict[str, dict[str, SpacyModelName]]] = (
             "zh": "zh_core_web_trf",
         }
     }
-)
+)  # type: ignore
 
 
 SpacyPipelineComponent = Literal[

@@ -102,7 +102,7 @@ function process(sourceCas, handler, parameters, targetCas)
     ---sentence. The general purpose batching functions from above deal with the rest.
     ---After the component has processed the sentences, we call `process_response` on the response directly.
 
-    local batch_size = parameters.request_batch_size or REQUEST_BATCH_SIZE
+    local batch_size = tonumber(parameters.request_batch_size) or REQUEST_BATCH_SIZE
     ---@type table<integer, any> table to aggregate references to created annotations
     local references = {}
     ---@type table<string, table>
@@ -143,7 +143,11 @@ function process(sourceCas, handler, parameters, targetCas)
     ---After processing all sentences, we can add the metadata to the target JCas.
     ---The metadata is provided by the component in the response, so we can just use it here.
 
-    add_annotator_metadata(targetCas, results.metadata, references)
+    if results.metadata ~= nil then
+        add_annotator_metadata(targetCas, results.metadata, references)
+    else
+        warn("last response did not contain metadata, cannot add SpacyAnnotatorMetaData annotation")
+    end
 end
 
 ---Process the response from the component.
