@@ -81,7 +81,8 @@ function process(sourceCas, handler, parameters, targetCas)
 
     handler:setHeader("Content-Type", "application/json")
 
-    local iterator, results = JCasUtil:select(sourceCas, luajava.bindClass(annotation_type)):iterator()
+    local results, modification = {}, nil
+    local iterator = JCasUtil:select(sourceCas, luajava.bindClass(annotation_type)):iterator()
     for batch in batched(iterator, batch_size) do
         local entities, references = table.unpack(batch)
         query.queries = entities
@@ -94,14 +95,16 @@ function process(sourceCas, handler, parameters, targetCas)
     
         results = json.decode(response:body())
         process_response(targetCas, results, references)
+        modification = results.modification or modification
     end
 
-    local results_modification = results.modification
-    local document_modification = luajava.newInstance("org.texttechnologylab.annotation.DocumentModification", targetCas)
-    document_modification:setUser(results_modification.user)
-    document_modification:setTimestamp(results_modification.timestamp)
-    document_modification:setComment(results_modification.comment)
-    document_modification:addToIndexes()
+    if modification ~= nil then
+        local document_modification = luajava.newInstance("org.texttechnologylab.annotation.DocumentModification", targetCas)
+        document_modification:setUser(modification.user)
+        document_modification:setTimestamp(modification.timestamp)
+        document_modification:setComment(modification.comment)
+        document_modification:addToIndexes()
+    end
 end
 
 ---Process the response from the component.
