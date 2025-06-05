@@ -7,7 +7,7 @@ import spacy
 import uvicorn
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import PlainTextResponse
-from spacy import Language
+from spacy import Language  # type: ignore
 
 from duui.const import (
     LUA_COMMUNICATION_LAYER,
@@ -112,7 +112,7 @@ async def v1_process(
     to_disable = set(to_disable).intersection(nlp.pipe_names)
     with nlp.select_pipes(disable=to_disable):
         tokens: list[TokenType] = []
-        dependencies: list[TokenType] = []
+        dependencies: list[DependencyType] = []
         entities: list[EntityType] = []
 
         texts = [sentence.text for sentence in params.sentences]
@@ -207,20 +207,32 @@ async def post_eos(
 
     nlp: Language = get_spacy_model(request.app.state, config)
 
-    if "senter" in nlp.pipe_names:
-        eos_pipe = ["senter"]
-    elif "parser" in nlp.pipe_names:
-        eos_pipe = ["senter"]
-        nlp.enable_pipe("senter")
-    elif "sentencizer" in nlp.pipe_names:
-        eos_pipe = ["sentencizer"]
+    if "senter" in nlp.component_names:
+        eos_component = "senter"
+    elif "sentencizer" in nlp.component_names:
+        eos_component = "sentencizer"
+    elif "parser" in nlp.component_names:
+        eos_component = "parser"
+        current_model = config.resolve_model()
+        message = (
+            "spaCy model has no explicit sentence segmentation component, using parser. "
+            f"This is expected for Transformer-based models, {{cond}} currently loaded '{current_model}'."
+        )
+        if "_trf" in current_model:
+            logger.info(message.format(cond="like"))
+        else:
+            logger.warning(message.format(cond="but NOT"))
     else:
         raise HTTPException(
             status_code=500,
-            detail="spaCy model does not have a sentence segmentation component",
+            detail=(
+                "spaCy model does not have a sentence segmentation component!\n "
+                f"Available components: {', '.join(nlp.component_names)}\n "
+                f"Enabled components: {', '.join(nlp.pipe_names)}"
+            ),
         )
 
-    with nlp.select_pipes(enable=eos_pipe):
+    with nlp.select_pipes(enable=[eos_component]):
         max_len = nlp.max_length
         nlp.max_length = len(params.text) + 1
         doc = nlp(params.text)

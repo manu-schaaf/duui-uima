@@ -15,11 +15,11 @@ from duui.errors import InvalidConfigurationError, NoModelError
 
 class SpacySettings(BaseSettings):
     spacy_language: Annotated[SpacyLanguage, Field(examples=["de"])] = "de"
-    spacy_model_size: Annotated[SpacyModelSize, Field(default="lg")]
+    spacy_model_size: Annotated[SpacyModelSize, Field(default="trf")]
     spacy_batch_size: Annotated[int, Field(default=32)] = 32
 
     spacy_model: Optional[
-        Annotated[SpacyModelName, Field(examples=["de_core_news_lg"])]
+        Annotated[SpacyModelName, Field(examples=["de_core_news_trf"])]
     ] = None
     spacy_exclude: Optional[
         Annotated[
@@ -57,4 +57,4 @@ class AppSettings(SpacySettings):
     request_batch_size: int = 1024
 
 
-SETTINGS: Final[AppSettings] = AppSettings()
+SETTINGS: Final[AppSettings] = AppSettings()  # type: ignore
