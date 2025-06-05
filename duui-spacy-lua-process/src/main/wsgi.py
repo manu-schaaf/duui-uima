@@ -1,16 +1,17 @@
 import logging
 from platform import python_version
-from sys import version as sys_version
 from typing import Final, get_args
 
-import spacy
 import uvicorn
 from fastapi import FastAPI, HTTPException, Request
+from fastapi.logger import logger
 from fastapi.responses import PlainTextResponse
 from spacy import Language  # type: ignore
 
 from duui.const import (
     LUA_COMMUNICATION_LAYER,
+    SPACY_VERSION,
+    SYS_VERSION,
     SpacyLanguage,
     SpacyModelName,
     SpacyPipelineComponent,
@@ -34,13 +35,13 @@ from duui.utils import (
     get_spacy_model,
 )
 
-LOGGING_CONFIG: Final[dict] = uvicorn.config.LOGGING_CONFIG
+LOGGING_CONFIG: Final[dict] = uvicorn.config.LOGGING_CONFIG  # type: ignore
 LOGGING_CONFIG["loggers"][""] = {
     "handlers": ["default"],
     "level": "INFO",
     "propagate": False,
 }
-logging.config.dictConfig(LOGGING_CONFIG)
+logging.config.dictConfig(LOGGING_CONFIG)  # type: ignore
 
 app = FastAPI()
 if not hasattr(app.state, "models"):
@@ -78,8 +79,8 @@ def get_documentation(request: Request) -> ComponentDocumentation:
         implementation_lang="Python",
         meta={
             "python_version": python_version(),
-            "python_version_full": sys_version,
-            "spacy_version": spacy.__version__,
+            "python_version_full": SYS_VERSION,
+            "spacy_version": SPACY_VERSION,
         },
         parameters={
             "spacy_model": list(get_args(SpacyModelName)),
@@ -178,8 +179,8 @@ async def v1_process(
             metadata=AnnotationMeta(
                 name=SETTINGS.component_name,
                 version=SETTINGS.component_version,
-                spacy_version=spacy.__version__,
-                model_lang=nlp.lang,
+                spacy_version=SPACY_VERSION,
+                model_lang=nlp.lang,  # type: ignore
                 model_name=nlp.meta["name"],
                 model_pipes=nlp.pipe_names,
                 model_spacy_git_version=nlp.meta["spacy_git_version"],
@@ -207,18 +208,19 @@ async def post_eos(
 
     nlp: Language = get_spacy_model(request.app.state, config)
 
-    if "senter" in nlp.component_names:
-        eos_component = "senter"
-    elif "sentencizer" in nlp.component_names:
+    # Infer the end-of-sentence component
+    model_name = nlp.meta.get("name", config.resolve_model())
+    if "sentencizer" in nlp.component_names:
         eos_component = "sentencizer"
+    elif "senter" in nlp.component_names:
+        eos_component = "senter"
     elif "parser" in nlp.component_names:
         eos_component = "parser"
-        current_model = config.resolve_model()
         message = (
-            "spaCy model has no explicit sentence segmentation component, using parser. "
-            f"This is expected for Transformer-based models, {{cond}} currently loaded '{current_model}'."
+            "spaCy model has no explicit sentence segmentation component, using 'parser'. "
+            f"This is expected for Transformer-based models, {{cond}} currently loaded '{nlp.lang}_{model_name}'."
         )
-        if "_trf" in current_model:
+        if "_trf" in model_name:
             logger.info(message.format(cond="like"))
         else:
             logger.warning(message.format(cond="but NOT"))
@@ -231,32 +233,47 @@ async def post_eos(
                 f"Enabled components: {', '.join(nlp.pipe_names)}"
             ),
         )
+    logger.info(
+        f"Using '{eos_component}' for sentence segmentation with model '{nlp.lang}_{model_name}'."
+    )
 
-    with nlp.select_pipes(enable=[eos_component]):
-        max_len = nlp.max_length
-        nlp.max_length = len(params.text) + 1
+    # If neccessary, enable the EOS component
+    enabled_eos_component = False
+    if eos_component not in nlp.pipe_names:
+        enabled_eos_component = True
+        nlp.enable_pipe(eos_component)
+
+    # Increase the max_length to accommodate the input text
+    max_len = nlp.max_length
+    nlp.max_length = len(params.text) + 1
+
+    with nlp.select_pipes(enable=eos_component):
         doc = nlp(params.text)
-        nlp.max_length = max_len
 
-        sentences = [
-            AnnotationType(
-                begin=sent.start_char,
-                end=sent.end_char,
-            )
-            for sent in doc.sents
-        ]
+    # Restore max_length and deactivate the EOS component if it was enabled
+    nlp.max_length = max_len
+    if enabled_eos_component:
+        nlp.disable_pipe(eos_component)
 
-        return EosResponse(
-            metadata=AnnotationMeta(
-                name=SETTINGS.component_name + "/eos",
-                version=SETTINGS.component_version,
-                spacy_version=spacy.__version__,
-                model_lang=nlp.lang,
-                model_name=nlp.meta["name"],
-                model_pipes=nlp.pipe_names,
-                model_spacy_git_version=nlp.meta["spacy_git_version"],
-                model_spacy_version=nlp.meta["spacy_version"],
-                model_version=nlp.meta["version"],
-            ),
-            sentences=sentences,
+    sentences = [
+        AnnotationType(
+            begin=sent.start_char,
+            end=sent.end_char,
         )
+        for sent in doc.sents
+    ]
+
+    return EosResponse(
+        metadata=AnnotationMeta(
+            name=SETTINGS.component_name + "/eos",
+            version=SETTINGS.component_version,
+            spacy_version=SPACY_VERSION,
+            model_lang=nlp.lang,  # type: ignore
+            model_name=model_name,
+            model_pipes=nlp.pipe_names,
+            model_spacy_git_version=nlp.meta["spacy_git_version"],
+            model_spacy_version=nlp.meta["spacy_version"],
+            model_version=nlp.meta["version"],
+        ),
+        sentences=sentences,
+    )

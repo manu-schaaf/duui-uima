@@ -17,6 +17,7 @@ class SpacySettings(BaseSettings):
     spacy_language: Annotated[SpacyLanguage, Field(examples=["de"])] = "de"
     spacy_model_size: Annotated[SpacyModelSize, Field(default="trf")]
     spacy_batch_size: Annotated[int, Field(default=32)] = 32
+    spacy_require_gpu: Annotated[bool, Field(default=False)] = False
 
     spacy_model: Optional[
         Annotated[SpacyModelName, Field(examples=["de_core_news_trf"])]
@@ -30,7 +31,10 @@ class SpacySettings(BaseSettings):
     spacy_disable: Optional[
         Annotated[
             list[SpacyPipelineComponent],
-            Field(default_factory=lambda: ["senter"], examples=[["senter"]]),
+            Field(
+                default_factory=lambda: ["senter", "sentencizer"],
+                examples=[["senter", "sentencizer"]],
+            ),
         ]
     ] = []
 

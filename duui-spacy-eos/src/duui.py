@@ -111,6 +111,7 @@ SPACY_MODEL_LOOKUP: Final[dict[SpacyLanguage, SpacyModel]] = {
 
 class SpacySettings(BaseSettings):
     spacy_language: SpacyLanguage = "xx"
+    spacy_require_gpu: bool = False
 
 
 class AppSettings(SpacySettings):
@@ -132,9 +133,14 @@ def load_model(state: State, settings: SpacySettings):
             detail=f"Invalid language '{language}'. Supported languages are: {', '.join(get_args(SpacyLanguage))}",
         )
     if not hasattr(state, "model") or state.model.lang != language:
+        if settings.spacy_require_gpu:
+            on_gpu = spacy.require_gpu()
+        else:
+            on_gpu = spacy.prefer_gpu()
+
         state.model = spacy.load(SPACY_MODEL_LOOKUP[language])
         logging.getLogger(__name__).info(
-            f"Loaded Model: {app.state.model.lang} ({app.state.model.meta['name']})"
+            f"Loaded Model: {app.state.model.lang}_{app.state.model.meta['name']} on {'GPU' if on_gpu else 'CPU'}"
         )
     return state.model
 

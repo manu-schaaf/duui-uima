@@ -11,8 +11,7 @@ import org.apache.uima.fit.factory.JCasFactory;
 import org.apache.uima.fit.util.JCasUtil;
 import org.apache.uima.jcas.JCas;
 import org.apache.uima.resource.ResourceInitializationException;
-import org.junit.jupiter.api.AfterAll;
-import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
 import org.texttechnologylab.DockerUnifiedUIMAInterface.driver.DUUIRemoteDriver;
@@ -25,32 +24,29 @@ import java.net.URISyntaxException;
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 public class TestSpacyBatched {
     final DockerTestContainerManager container = new DockerTestContainerManager(
-            "docker.texttechnologylab.org/duui-spacy-lua-process:0.1.1",
+            "docker.texttechnologylab.org/duui-spacy-lua-process:0.2.0",
             6000
     );
 
-    DUUIComposer composer;
+    static class ComposerManager implements AutoCloseable {
+        public final DUUIComposer composer;
+        public ComposerManager() throws Exception {
+            composer = new DUUIComposer()
+                    .withLuaContext(
+                            new DUUILuaContext()
+                                    .withJsonLibrary())
+                    .withSkipVerification(true);
+            composer.addDriver(new DUUIRemoteDriver(10000));
+        }
 
-    @BeforeAll
-    public void setUp() throws Exception {
-        composer = new DUUIComposer()
-                .withLuaContext(
-                        new DUUILuaContext()
-                                .withJsonLibrary())
-                .withSkipVerification(true);
-        composer.addDriver(new DUUIRemoteDriver(10000));
-    }
-
-    @AfterAll
-    public void shutdown() throws Exception {
-        if (composer != null)
+        @Override
+        public void close() throws Exception {
             composer.shutdown();
-
-        container.close();
+        }
     }
 
     private DUUIRemoteDriver.Component getComponent() throws URISyntaxException, IOException {
-        return new DUUIRemoteDriver.Component("http://localhost:%d".formatted(container.getPort()));
+       return new DUUIRemoteDriver.Component("http://localhost:%d".formatted(container.getPort()));
     }
 
     private static JCas getJCas() throws ResourceInitializationException, CASException {
@@ -64,37 +60,157 @@ public class TestSpacyBatched {
     }
 
     @Test
-    public void test_with_sentences() throws Exception {
-        composer.resetPipeline();
-        composer.add(
-                getComponent()
-                        .withParameter("spacy_model_size", "lg")
-                        .build()
-        );
+    public void test_sm_wo_sents() throws Exception {
+        try (ComposerManager mngr = new ComposerManager()) {
+            DUUIComposer composer = mngr.composer;
+            composer.add(
+                    getComponent()
+                            .withParameter("spacy_model_size", "sm")
+                            .build()
+            );
 
-        JCas jCas = getJCas();
-        new Sentence(jCas, 0, 104).addToIndexes();
-        new Sentence(jCas, 106, 177).addToIndexes();
+            JCas jCas = getJCas();
 
-        composer.run(jCas, "lua-process-test/w-sentences");
+            composer.run(jCas, "spacy-lua-process-test/sm-wo-sents");
+            composer.resetPipeline();
 
-        printResult(jCas);
+            printResult(jCas);
+        }
     }
 
     @Test
-    public void test_wo_sentences() throws Exception {
-        composer.resetPipeline();
-        composer.add(
-                getComponent()
-                        .withParameter("spacy_model_size", "sm")
-                        .build()
-        );
+    public void test_sm_w_sents() throws Exception {
+        try (ComposerManager mngr = new ComposerManager()) {
+            DUUIComposer composer = mngr.composer;
+            composer.add(
+                    getComponent()
+                            .withParameter("spacy_model_size", "sm")
+                            .build()
+            );
 
-        JCas jCas = getJCas();
+            JCas jCas = getJCas();
+            new Sentence(jCas, 0, 104).addToIndexes();
+            new Sentence(jCas, 106, 177).addToIndexes();
 
-        composer.run(jCas, "lua-process-test/wo-sentences");
+            composer.run(jCas, "spacy-lua-process-test/sm-w-sents");
 
-        printResult(jCas);
+            printResult(jCas);
+        }
+    }
+
+    @Test
+    public void test_md_wo_sents() throws Exception {
+        try (ComposerManager mngr = new ComposerManager()) {
+            DUUIComposer composer = mngr.composer;
+            composer.add(
+                    getComponent()
+                            .withParameter("spacy_model_size", "md")
+                            .build()
+            );
+
+            JCas jCas = getJCas();
+
+            composer.run(jCas, "spacy-lua-process-test/md-wo-sents");
+
+            printResult(jCas);
+        }
+    }
+
+    @Test
+    public void test_md_w_sents() throws Exception {
+        try (ComposerManager mngr = new ComposerManager()) {
+            DUUIComposer composer = mngr.composer;
+            composer.add(
+                    getComponent()
+                            .withParameter("spacy_model_size", "md")
+                            .build()
+            );
+
+            JCas jCas = getJCas();
+            new Sentence(jCas, 0, 104).addToIndexes();
+            new Sentence(jCas, 106, 177).addToIndexes();
+
+            composer.run(jCas, "spacy-lua-process-test/md-w-sents");
+
+            printResult(jCas);
+        }
+    }
+
+    @Test
+    public void test_lg_wo_sents() throws Exception {
+        try (ComposerManager mngr = new ComposerManager()) {
+            DUUIComposer composer = mngr.composer;
+            composer.add(
+                    getComponent()
+                            .withParameter("spacy_model_size", "lg")
+                            .build()
+            );
+
+            JCas jCas = getJCas();
+
+            composer.run(jCas, "spacy-lua-process-test/lg-wo-sents");
+
+            printResult(jCas);
+        }
+    }
+
+    @Test
+    public void test_lg_w_sents() throws Exception {
+        try (ComposerManager mngr = new ComposerManager()) {
+            DUUIComposer composer = mngr.composer;
+            composer.add(
+                    getComponent()
+                            .withParameter("spacy_model_size", "lg")
+                            .build()
+            );
+
+            JCas jCas = getJCas();
+            new Sentence(jCas, 0, 104).addToIndexes();
+            new Sentence(jCas, 106, 177).addToIndexes();
+
+            composer.run(jCas, "spacy-lua-process-test/lg-w-sents");
+
+            printResult(jCas);
+        }
+    }
+
+    @Test
+    public void test_trf_wo_sents() throws Exception {
+        try (ComposerManager mngr = new ComposerManager()) {
+            DUUIComposer composer = mngr.composer;
+            composer.add(
+                    getComponent()
+                            .withParameter("spacy_model_size", "trf")
+                            .build()
+            );
+
+            JCas jCas = getJCas();
+
+            composer.run(jCas, "spacy-lua-process-test/trf-wo-sents");
+            composer.resetPipeline();
+
+            printResult(jCas);
+        }
+    }
+
+    @Test
+    public void test_trf_w_sents() throws Exception {
+        try (ComposerManager mngr = new ComposerManager()) {
+            DUUIComposer composer = mngr.composer;
+            composer.add(
+                    getComponent()
+                            .withParameter("spacy_model_size", "trf")
+                            .build()
+            );
+
+            JCas jCas = getJCas();
+            new Sentence(jCas, 0, 104).addToIndexes();
+            new Sentence(jCas, 106, 177).addToIndexes();
+
+            composer.run(jCas, "spacy-lua-process-test/trf");
+
+            printResult(jCas);
+        }
     }
 
     private static void printResult(JCas jCas) {
