@@ -1,11 +1,21 @@
 package org.texttechnologylab.duui.heideltimex.biofid;
 
+import static org.apache.uima.fit.factory.AnalysisEngineFactory.createEngineDescription;
+
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpHandler;
 import com.sun.net.httpserver.HttpServer;
 import de.tudarmstadt.ukp.dkpro.core.api.segmentation.type.Sentence;
 import de.tudarmstadt.ukp.dkpro.core.api.segmentation.type.Token;
 import de.unihd.dbs.uima.types.heideltime.Timex3;
+import java.io.IOException;
+import java.io.OutputStream;
+import java.io.PrintWriter;
+import java.io.StringWriter;
+import java.net.InetSocketAddress;
+import java.nio.charset.Charset;
+import java.util.Arrays;
+import java.util.Iterator;
 import org.apache.uima.UIMAException;
 import org.apache.uima.analysis_engine.AnalysisEngine;
 import org.apache.uima.cas.impl.XmiCasDeserializer;
@@ -25,19 +35,10 @@ import org.slf4j.LoggerFactory;
 import org.texttechnologylab.annotation.type.Time;
 import org.xml.sax.SAXException;
 
-import java.io.IOException;
-import java.io.OutputStream;
-import java.io.StringWriter;
-import java.net.InetSocketAddress;
-import java.nio.charset.Charset;
-import java.util.Arrays;
-import java.util.Iterator;
-
-import static org.apache.uima.fit.factory.AnalysisEngineFactory.createEngineDescription;
-
 public class Component implements AutoCloseable {
-    static HttpServer server;
-    final static Logger logger = LoggerFactory.getLogger(Component.class);
+
+    private static final Logger logger = LoggerFactory.getLogger(Component.class);
+    private static HttpServer server;
 
     public static void main(String[] args) throws Exception {
         int port = 9714;
@@ -80,10 +81,10 @@ public class Component implements AutoCloseable {
         } else if (workers > 0) {
             server.setExecutor(java.util.concurrent.Executors.newFixedThreadPool(workers));
         } else {
-            server.setExecutor(java.util.concurrent.Executors.newCachedThreadPool()); // creates a default executor
+            server.setExecutor(java.util.concurrent.Executors.newCachedThreadPool());
         }
         server.start();
-        logger.info("Server Started");
+        logger.info("Server Running");
         return server;
     }
 
@@ -95,8 +96,9 @@ public class Component implements AutoCloseable {
     }
 
     static class ProcessHandler implements HttpHandler {
-        final private JCas jCas;
-        final private AnalysisEngine analysisEngine;
+
+        private final JCas jCas;
+        private final AnalysisEngine analysisEngine;
 
         public ProcessHandler() {
             try {
@@ -113,6 +115,8 @@ public class Component implements AutoCloseable {
         @Override
         public void handle(HttpExchange t) throws IOException {
             try {
+                String contentLength = t.getRequestHeaders().getFirst("Content-Length");
+                logger.info("Processing Request (size={})", contentLength);
                 jCas.reset();
                 XmiSerializationSharedData sharedData = new XmiSerializationSharedData();
                 XmiCasDeserializer.deserialize(t.getRequestBody(), jCas.getCas(), true, sharedData);
@@ -133,15 +137,17 @@ public class Component implements AutoCloseable {
             } catch (SAXException | IOException e) {
                 logger.error(e.getMessage(), e);
 
-                String message = e.getMessage();
-                // 422: Unprocessable Content
-                t.sendResponseHeaders(422, message.length());
+                StringWriter sw = new StringWriter();
+                e.printStackTrace(new PrintWriter(sw));
+                String message = e.getMessage() + ":\n" + sw;
+                t.sendResponseHeaders(422, message.length()); // 422: Unprocessable Content
                 t.getResponseBody().write(message.getBytes(Charset.defaultCharset()));
-
             } catch (Exception e) {
                 logger.error(e.getMessage(), e);
 
-                String message = e.getMessage();
+                StringWriter sw = new StringWriter();
+                e.printStackTrace(new PrintWriter(sw));
+                String message = e.getMessage() + ":\n" + sw;
                 t.sendResponseHeaders(500, message.length());
                 t.getResponseBody().write(message.getBytes(Charset.defaultCharset()));
             } finally {
@@ -151,6 +157,7 @@ public class Component implements AutoCloseable {
     }
 
     static class TypesystemHandler implements HttpHandler {
+
         @Override
         public void handle(HttpExchange t) throws IOException {
             try {
@@ -165,17 +172,19 @@ public class Component implements AutoCloseable {
             } catch (Exception e) {
                 logger.error(e.getMessage(), e);
 
-                String message = e.getMessage();
+                StringWriter sw = new StringWriter();
+                e.printStackTrace(new PrintWriter(sw));
+                String message = e.getMessage() + ":\n" + sw;
                 t.sendResponseHeaders(500, message.length());
                 t.getResponseBody().write(message.getBytes(Charset.defaultCharset()));
             } finally {
                 t.getResponseBody().close();
             }
-
         }
     }
 
     static class IOHandler implements HttpHandler {
+
         @Override
         public void handle(HttpExchange t) throws IOException {
             try {
@@ -187,7 +196,6 @@ public class Component implements AutoCloseable {
 
                 OutputStream os = t.getResponseBody();
                 os.write(response.getBytes(Charset.defaultCharset()));
-
             } catch (Exception e) {
                 logger.error(e.getMessage(), e);
 
@@ -197,23 +205,24 @@ public class Component implements AutoCloseable {
             } finally {
                 t.getResponseBody().close();
             }
-
         }
     }
 
     static class CommunicationLayer implements HttpHandler {
+
         @Override
         public void handle(HttpExchange t) throws IOException {
-            String response = "serial = luajava.bindClass(\"org.apache.uima.cas.impl.XmiCasSerializer\")\n" +
-                    "deserial = luajava.bindClass(\"org.apache.uima.cas.impl.XmiCasDeserializer\")" +
-                    "function serialize(inputCas,outputStream,params)\n" +
-                    "  serial:serialize(inputCas:getCas(),outputStream)\n" +
-                    "end\n" +
-                    "\n" +
-                    "function deserialize(inputCas,inputStream)\n" +
-                    "  inputCas:reset()\n" +
-                    "  deserial:deserialize(inputStream,inputCas:getCas(),true)\n" +
-                    "end";
+            String response =
+                "serial = luajava.bindClass(\"org.apache.uima.cas.impl.XmiCasSerializer\")\n" +
+                "deserial = luajava.bindClass(\"org.apache.uima.cas.impl.XmiCasDeserializer\")" +
+                "function serialize(inputCas,outputStream,params)\n" +
+                "  serial:serialize(inputCas:getCas(),outputStream)\n" +
+                "end\n" +
+                "\n" +
+                "function deserialize(inputCas,inputStream)\n" +
+                "  inputCas:reset()\n" +
+                "  deserial:deserialize(inputStream,inputCas:getCas(),true)\n" +
+                "end";
             t.sendResponseHeaders(200, response.length());
             OutputStream os = t.getResponseBody();
             os.write(response.getBytes());
