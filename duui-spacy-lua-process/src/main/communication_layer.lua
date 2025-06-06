@@ -58,6 +58,19 @@ function get_sentence_and_offset(sentence)
     }
 end
 
+---Split a string by commas into a table of stringsl, while stripping whitespaces and dropping empty strings.
+---@param str string a string to split by commas
+---@return table<integer, string> a table of strings
+local function split_comma(str)
+    ---Split a string by commas and return a table of strings.
+    ---This is used to parse the `spacy_disable` parameter.
+    local result = {}
+    for part in str:gmatch("[^,%s]+") do
+        table.insert(result, part)
+    end
+    return result
+end
+
 ---We can define settings here or we could fetch them from the component using separate endpoints.
 REQUEST_BATCH_SIZE = 1024
 
@@ -72,6 +85,7 @@ function process(sourceCas, handler, parameters, targetCas)
         spacy_language = sourceCas:getDocumentLanguage(),
         spacy_model_size = parameters.spacy_model_size or "lg",
         spacy_batch_size = tonumber(parameters.spacy_batch_size) or 32,
+        spacy_disable = split_comma(parameters.spacy_disable or ""),
     }
 
     targetCas = targetCas or sourceCas
