@@ -50,7 +50,7 @@
                 <configuration>
                     <archive>
                         <manifest>
-                            <mainClass>org.texttechnologylab.duui.heideltimex.Component</mainClass>
+                            <mainClass>org.texttechnologylab.duui.heideltimex.biofid.Component</mainClass>
                         </manifest>
                     </archive>
                     <descriptorRefs>

@@ -7,4 +7,4 @@ RUN git clone --depth=1 --branch=dev-uima3 https://github.com/manu-schaaf/heidel
 ADD src/main src/main
 ADD pom.xml pom.xml
 RUN mvn -DskipTests clean package
-CMD java -cp target/heideltimex-*-jar-with-dependencies.jar org.texttechnologylab.duui.heideltimex.Component
+CMD java -cp target/heideltimex-*-jar-with-dependencies.jar org.texttechnologylab.duui.heideltimex.biofid.Component
