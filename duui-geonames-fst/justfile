@@ -1,14 +1,19 @@
-version := "0.3.4"
+version := "0.4.0"
+fst_version := "0.4.0"
 
 # runs: just country de, just eu, just europe, just europe-central
 default version=version:
     just country "de" {{version}}
+    just country "gb" {{version}}
+    just country "us" {{version}}
+    just country "fr" {{version}}
+    just country "es" {{version}}
     just eu {{version}}
     just europe {{version}}
     just europe-central {{version}}
 
 _build version=version variant="de" dockerfile="src/main/docker/single.Dockerfile":
-    docker build -f {{dockerfile}} -t duui-geonames-fst/{{variant}}:{{version}} --build-arg COUNTRY={{uppercase(variant)}} .
+    docker build -f {{dockerfile}} -t duui-geonames-fst/{{variant}}:{{version}} --build-arg GEONAMES_FST_VERSION={{fst_version}} --build-arg COUNTRY={{uppercase(variant)}} .
     docker tag duui-geonames-fst/{{variant}}:{{version}} duui-geonames-fst/{{variant}}:latest
 
 _tag version=version variant="de":
