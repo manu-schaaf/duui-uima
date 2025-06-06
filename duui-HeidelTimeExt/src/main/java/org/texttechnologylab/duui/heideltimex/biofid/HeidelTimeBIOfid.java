@@ -14,7 +14,7 @@
  * Adaption for BioFID by Andy Lücking, 2021-11-30
  */
 
-package org.texttechnologylab.duui.heideltimex;
+package org.texttechnologylab.duui.heideltimex.biofid;
 
 import de.tudarmstadt.ukp.dkpro.core.api.segmentation.type.Sentence;
 import de.tudarmstadt.ukp.dkpro.core.api.segmentation.type.Token;
@@ -26,7 +26,6 @@ import de.unihd.dbs.uima.annotator.heideltime.utilities.DateCalculator;
 import de.unihd.dbs.uima.annotator.heideltime.utilities.LocaleException;
 import de.unihd.dbs.uima.annotator.heideltime.utilities.Logger;
 import de.unihd.dbs.uima.annotator.heideltime.utilities.Toolbox;
-import org.texttechnologylab.duui.heideltimex.ContextAnalyzer;
 import de.unihd.dbs.uima.types.heideltime.Dct;
 import de.unihd.dbs.uima.types.heideltime.Timex3;
 import org.apache.uima.UimaContext;
@@ -47,7 +46,7 @@ import java.util.regex.Pattern;
  * @author jannik stroetgen
  * 
  */
-public class HeidelTimeBioFID extends JCasAnnotator_ImplBase {
+public class HeidelTimeBIOfid extends JCasAnnotator_ImplBase {
 
 	// TOOL NAME (may be used as componentId)
 	private Class<?> component = this.getClass();

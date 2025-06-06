@@ -1,4 +1,4 @@
-package org.texttechnologylab.duui.heideltimex;
+package org.texttechnologylab.duui.heideltimex.biofid;
 
 import de.tudarmstadt.ukp.dkpro.core.api.segmentation.type.Sentence;
 import de.tudarmstadt.ukp.dkpro.core.api.segmentation.type.Token;

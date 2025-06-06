@@ -1,11 +1,10 @@
-package org.texttechnologylab.duui.heideltimex;
+package org.texttechnologylab.duui.heideltimex.biofid;
 
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpHandler;
 import com.sun.net.httpserver.HttpServer;
 import de.tudarmstadt.ukp.dkpro.core.api.segmentation.type.Sentence;
 import de.tudarmstadt.ukp.dkpro.core.api.segmentation.type.Token;
-import de.unihd.dbs.uima.annotator.heideltime.HeidelTime;
 import de.unihd.dbs.uima.types.heideltime.Timex3;
 import org.apache.uima.UIMAException;
 import org.apache.uima.analysis_engine.AnalysisEngine;
@@ -104,7 +103,7 @@ public class Component implements AutoCloseable {
                 jCas = JCasFactory.createJCas();
 
                 AggregateBuilder pipeline = new AggregateBuilder();
-                pipeline.add(createEngineDescription(HeidelTime.class, "Language", "de"));
+                pipeline.add(createEngineDescription(HeidelTimeBIOfid.class));
                 analysisEngine = pipeline.createAggregate();
             } catch (UIMAException e) {
                 throw new RuntimeException(e);
