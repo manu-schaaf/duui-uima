@@ -1,4 +1,4 @@
-package org.texttechnologylab.tools;
+package org.texttechnologylab.duui.heideltimex;
 
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpHandler;
@@ -6,7 +6,6 @@ import com.sun.net.httpserver.HttpServer;
 import de.tudarmstadt.ukp.dkpro.core.api.segmentation.type.Sentence;
 import de.tudarmstadt.ukp.dkpro.core.api.segmentation.type.Token;
 import de.unihd.dbs.uima.annotator.heideltime.HeidelTime;
-import de.unihd.dbs.uima.annotator.heideltime.biofid.HeidelTimeBioFID;
 import de.unihd.dbs.uima.types.heideltime.Timex3;
 import org.apache.uima.UIMAException;
 import org.apache.uima.analysis_engine.AnalysisEngine;
@@ -19,11 +18,11 @@ import org.apache.uima.fit.factory.TypeSystemDescriptionFactory;
 import org.apache.uima.fit.pipeline.SimplePipeline;
 import org.apache.uima.fit.util.JCasUtil;
 import org.apache.uima.jcas.JCas;
-import org.apache.uima.resource.ResourceInitializationException;
 import org.apache.uima.resource.metadata.TypeSystemDescription;
 import org.json.JSONArray;
-import org.json.JSONException;
 import org.json.JSONObject;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.texttechnologylab.annotation.type.Time;
 import org.xml.sax.SAXException;
 
@@ -32,51 +31,97 @@ import java.io.OutputStream;
 import java.io.StringWriter;
 import java.net.InetSocketAddress;
 import java.nio.charset.Charset;
+import java.util.Arrays;
+import java.util.Iterator;
 
 import static org.apache.uima.fit.factory.AnalysisEngineFactory.createEngineDescription;
 
-public class HeidelTimeExt {
+public class Component implements AutoCloseable {
+    static HttpServer server;
+    final static Logger logger = LoggerFactory.getLogger(Component.class);
 
     public static void main(String[] args) throws Exception {
-        HttpServer server = HttpServer.create(new InetSocketAddress(9714), 0);
+        int port = 9714;
+        int workers = -1;
+        Iterator<String> argsIterator = Arrays.asList(args).iterator();
+        while (argsIterator.hasNext()) {
+            String key = argsIterator.next().strip();
+            int value;
+            if (key.contains("=")) {
+                value = Integer.parseInt(key.substring(key.indexOf("=") + 1));
+                key = key.substring(0, key.indexOf("="));
+            } else {
+                value = Integer.parseInt(argsIterator.next());
+            }
+            switch (key) {
+                case "-p":
+                case "--port":
+                    port = value;
+                    break;
+                case "-j":
+                case "--workers":
+                    workers = value;
+                    break;
+                default:
+                    throw new IllegalArgumentException("Unknown option: " + key);
+            }
+        }
+        server = startSever(port, workers);
+    }
+
+    public static HttpServer startSever(int port, int workers) throws IOException {
+        HttpServer server = HttpServer.create(new InetSocketAddress(port), 0);
         server.createContext("/v1/communication_layer", new CommunicationLayer());
         server.createContext("/v1/typesystem", new TypesystemHandler());
         server.createContext("/v1/process", new ProcessHandler());
         server.createContext("/v1/details/input_output", new IOHandler());
 
-        server.setExecutor(null); // creates a default executor
+        if (workers == 1) {
+            server.setExecutor(java.util.concurrent.Executors.newSingleThreadExecutor());
+        } else if (workers > 0) {
+            server.setExecutor(java.util.concurrent.Executors.newFixedThreadPool(workers));
+        } else {
+            server.setExecutor(java.util.concurrent.Executors.newCachedThreadPool()); // creates a default executor
+        }
         server.start();
-        System.out.println(HeidelTimeExt.class.getSimpleName()+" ready");
+        logger.info("Server Started");
+        return server;
+    }
+
+    @Override
+    public void close() throws Exception {
+        if (server != null) {
+            server.stop(0);
+        }
     }
 
     static class ProcessHandler implements HttpHandler {
-        static JCas jc;
-        private static AggregateBuilder pipeline = new AggregateBuilder();
-        private static AnalysisEngine pAE = null;
+        final private JCas jCas;
+        final private AnalysisEngine analysisEngine;
 
-        static {
+        public ProcessHandler() {
             try {
-                jc = JCasFactory.createJCas();
-                pipeline.add(createEngineDescription(HeidelTimeBioFID.class));
+                jCas = JCasFactory.createJCas();
 
+                AggregateBuilder pipeline = new AggregateBuilder();
+                pipeline.add(createEngineDescription(HeidelTime.class, "Language", "de"));
+                analysisEngine = pipeline.createAggregate();
             } catch (UIMAException e) {
-                e.printStackTrace();
+                throw new RuntimeException(e);
             }
         }
 
         @Override
         public void handle(HttpExchange t) throws IOException {
             try {
-                jc.reset();
-
+                jCas.reset();
                 XmiSerializationSharedData sharedData = new XmiSerializationSharedData();
+                XmiCasDeserializer.deserialize(t.getRequestBody(), jCas.getCas(), true, sharedData);
 
-                XmiCasDeserializer.deserialize(t.getRequestBody(), jc.getCas(), true, sharedData);
-                pAE = pipeline.createAggregate();
-                SimplePipeline.runPipeline(jc, pAE);
+                SimplePipeline.runPipeline(jCas, analysisEngine);
 
-                for (Timex3 timex3 : JCasUtil.select(jc, Timex3.class)) {
-                    Time nTime = new Time(jc);
+                for (Timex3 timex3 : JCasUtil.select(jCas, Timex3.class)) {
+                    Time nTime = new Time(jCas);
                     nTime.setBegin(timex3.getBegin());
                     nTime.setEnd(timex3.getEnd());
                     nTime.setValue(timex3.getTimexType());
@@ -85,15 +130,24 @@ public class HeidelTimeExt {
                 }
 
                 t.sendResponseHeaders(200, 0);
-                XmiCasSerializer.serialize(jc.getCas(), null, t.getResponseBody(), false, sharedData);
+                XmiCasSerializer.serialize(jCas.getCas(), null, t.getResponseBody(), false, sharedData);
+            } catch (SAXException | IOException e) {
+                logger.error(e.getMessage(), e);
 
-                t.getResponseBody().close();
+                String message = e.getMessage();
+                // 422: Unprocessable Content
+                t.sendResponseHeaders(422, message.length());
+                t.getResponseBody().write(message.getBytes(Charset.defaultCharset()));
+
             } catch (Exception e) {
-                e.printStackTrace();
-                t.sendResponseHeaders(404, -1);
-            }
+                logger.error(e.getMessage(), e);
 
-            t.getResponseBody().close();
+                String message = e.getMessage();
+                t.sendResponseHeaders(500, message.length());
+                t.getResponseBody().write(message.getBytes(Charset.defaultCharset()));
+            } finally {
+                t.getResponseBody().close();
+            }
         }
     }
 
@@ -108,15 +162,13 @@ public class HeidelTimeExt {
 
                 t.sendResponseHeaders(200, response.getBytes(Charset.defaultCharset()).length);
 
-                OutputStream os = t.getResponseBody();
-                os.write(response.getBytes(Charset.defaultCharset()));
+                t.getResponseBody().write(response.getBytes(Charset.defaultCharset()));
+            } catch (Exception e) {
+                logger.error(e.getMessage(), e);
 
-            } catch (ResourceInitializationException e) {
-                e.printStackTrace();
-                t.sendResponseHeaders(404, -1);
-                return;
-            } catch (SAXException e) {
-                e.printStackTrace();
+                String message = e.getMessage();
+                t.sendResponseHeaders(500, message.length());
+                t.getResponseBody().write(message.getBytes(Charset.defaultCharset()));
             } finally {
                 t.getResponseBody().close();
             }
@@ -137,10 +189,12 @@ public class HeidelTimeExt {
                 OutputStream os = t.getResponseBody();
                 os.write(response.getBytes(Charset.defaultCharset()));
 
-            } catch (JSONException e) {
-                e.printStackTrace();
-                t.sendResponseHeaders(404, -1);
-                return;
+            } catch (Exception e) {
+                logger.error(e.getMessage(), e);
+
+                String message = e.getMessage();
+                t.sendResponseHeaders(500, message.length());
+                t.getResponseBody().write(message.getBytes(Charset.defaultCharset()));
             } finally {
                 t.getResponseBody().close();
             }
