@@ -3,11 +3,6 @@ from platform import python_version
 from typing import Final, get_args
 
 import uvicorn
-from fastapi import FastAPI, HTTPException, Request
-from fastapi.logger import logger
-from fastapi.responses import PlainTextResponse
-from spacy import Language  # type: ignore
-
 from duui.const import (
     LUA_COMMUNICATION_LAYER,
     SPACY_VERSION,
@@ -34,6 +29,10 @@ from duui.settings import SETTINGS, SpacySettings
 from duui.utils import (
     get_spacy_model,
 )
+from fastapi import FastAPI, HTTPException, Request
+from fastapi.logger import logger
+from fastapi.responses import PlainTextResponse
+from spacy import Language  # type: ignore
 
 LOGGING_CONFIG: Final[dict] = uvicorn.config.LOGGING_CONFIG  # type: ignore
 LOGGING_CONFIG["loggers"][""] = {
@@ -110,6 +109,9 @@ async def v1_process(
     nlp: Language = get_spacy_model(request.app.state, config)
 
     to_disable = config.spacy_disable or SETTINGS.spacy_disable or []
+    if isinstance(to_disable, str):
+        to_disable = to_disable.split(",")
+
     to_disable = set(to_disable).intersection(nlp.pipe_names)
     with nlp.select_pipes(disable=to_disable):
         tokens: list[TokenType] = []

@@ -1,4 +1,4 @@
-version := "0.2.0"
+version := "0.2.1"
 
 # runs: just country de, just eu, just europe, just europe-central
 default version=version:

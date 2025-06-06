@@ -15,15 +15,21 @@ def load_spacy_model(
     model_name: Optional[SpacyModelName] = None,
 ) -> Language:
     if settings.spacy_require_gpu:
-        on_gpu = spacy.require_gpu()
+        on_gpu = spacy.require_gpu()  # type: ignore
     else:
-        on_gpu = spacy.prefer_gpu()
+        on_gpu = spacy.prefer_gpu()  # type: ignore
+
+    to_exclude = (
+        settings.spacy_exclude
+        if settings.spacy_exclude is not None
+        else SETTINGS.spacy_exclude
+    )  # type: ignore
+    if isinstance(to_exclude, str):
+        to_exclude: list[str] = to_exclude.split(",")
 
     model = spacy.load(
         model_name or settings.resolve_model(),
-        exclude=settings.spacy_exclude
-        if settings.spacy_exclude is not None
-        else SETTINGS.spacy_exclude,
+        exclude=to_exclude,
     )
 
     logger.info(f"Loaded spaCy model: {model_name} on {'GPU' if on_gpu else 'CPU'}")
