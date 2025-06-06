@@ -138,7 +138,7 @@ function process(sourceCas, handler, parameters, targetCas)
         ---If there is an error, we can deal with it here. We could also make use of additional information
         ---provided by the component, e.g. the error message in the body.
         ---Here, we just throw an error with the status code and body.
-        
+
         if response:statusCode() ~= 200 then
             error("Error " .. response:statusCode() .. " in communication with component: " .. response:bodyUtf8())
         end
@@ -163,6 +163,70 @@ function process(sourceCas, handler, parameters, targetCas)
         warn("last response did not contain metadata, cannot add SpacyAnnotatorMetaData annotation")
     end
 end
+
+---A lookup table for dependency types, mapping upper-case dependency types to their
+---corresponding Java class names.
+---@type table<stringlib, string>
+DEP_TYPE_LOOKUP = {
+    ROOT = "de.tudarmstadt.ukp.dkpro.core.api.syntax.type.dependency.ROOT",
+    ABBREV = "de.tudarmstadt.ukp.dkpro.core.api.syntax.type.dependency.ABBREV",
+    ACOMP = "de.tudarmstadt.ukp.dkpro.core.api.syntax.type.dependency.ACOMP",
+    ADVCL = "de.tudarmstadt.ukp.dkpro.core.api.syntax.type.dependency.ADVCL",
+    ADVMOD = "de.tudarmstadt.ukp.dkpro.core.api.syntax.type.dependency.ADVMOD",
+    AGENT = "de.tudarmstadt.ukp.dkpro.core.api.syntax.type.dependency.AGENT",
+    AMOD = "de.tudarmstadt.ukp.dkpro.core.api.syntax.type.dependency.AMOD",
+    APPOS = "de.tudarmstadt.ukp.dkpro.core.api.syntax.type.dependency.APPOS",
+    ATTR = "de.tudarmstadt.ukp.dkpro.core.api.syntax.type.dependency.ATTR",
+    AUX0 = "de.tudarmstadt.ukp.dkpro.core.api.syntax.type.dependency.AUX0",
+    AUXPASS = "de.tudarmstadt.ukp.dkpro.core.api.syntax.type.dependency.AUXPASS",
+    CC = "de.tudarmstadt.ukp.dkpro.core.api.syntax.type.dependency.CC",
+    CCOMP = "de.tudarmstadt.ukp.dkpro.core.api.syntax.type.dependency.CCOMP",
+    COMPLM = "de.tudarmstadt.ukp.dkpro.core.api.syntax.type.dependency.COMPLM",
+    CONJ = "de.tudarmstadt.ukp.dkpro.core.api.syntax.type.dependency.CONJ",
+    CONJ_YET = "de.tudarmstadt.ukp.dkpro.core.api.syntax.type.dependency.CONJ_YET",
+    CONJP = "de.tudarmstadt.ukp.dkpro.core.api.syntax.type.dependency.CONJP",
+    COP = "de.tudarmstadt.ukp.dkpro.core.api.syntax.type.dependency.COP",
+    CSUBJ = "de.tudarmstadt.ukp.dkpro.core.api.syntax.type.dependency.CSUBJ",
+    CSUBJPASS = "de.tudarmstadt.ukp.dkpro.core.api.syntax.type.dependency.CSUBJPASS",
+    DEP = "de.tudarmstadt.ukp.dkpro.core.api.syntax.type.dependency.DEP",
+    DET = "de.tudarmstadt.ukp.dkpro.core.api.syntax.type.dependency.DET",
+    DOBJ = "de.tudarmstadt.ukp.dkpro.core.api.syntax.type.dependency.DOBJ",
+    EXPL = "de.tudarmstadt.ukp.dkpro.core.api.syntax.type.dependency.EXPL",
+    INFMOD = "de.tudarmstadt.ukp.dkpro.core.api.syntax.type.dependency.INFMOD",
+    IOBJ = "de.tudarmstadt.ukp.dkpro.core.api.syntax.type.dependency.IOBJ",
+    MARK = "de.tudarmstadt.ukp.dkpro.core.api.syntax.type.dependency.MARK",
+    MEASURE = "de.tudarmstadt.ukp.dkpro.core.api.syntax.type.dependency.MEASURE",
+    MWE = "de.tudarmstadt.ukp.dkpro.core.api.syntax.type.dependency.MWE",
+    NEG = "de.tudarmstadt.ukp.dkpro.core.api.syntax.type.dependency.NEG",
+    NN = "de.tudarmstadt.ukp.dkpro.core.api.syntax.type.dependency.NN",
+    NPADVMOD = "de.tudarmstadt.ukp.dkpro.core.api.syntax.type.dependency.NPADVMOD",
+    NSUBJ = "de.tudarmstadt.ukp.dkpro.core.api.syntax.type.dependency.NSUBJ",
+    NSUBJPASS = "de.tudarmstadt.ukp.dkpro.core.api.syntax.type.dependency.NSUBJPASS",
+    NUM = "de.tudarmstadt.ukp.dkpro.core.api.syntax.type.dependency.NUM",
+    NUMBER = "de.tudarmstadt.ukp.dkpro.core.api.syntax.type.dependency.NUMBER",
+    PARATAXIS = "de.tudarmstadt.ukp.dkpro.core.api.syntax.type.dependency.PARATAXIS",
+    PARTMOD = "de.tudarmstadt.ukp.dkpro.core.api.syntax.type.dependency.PARTMOD",
+    PCOMP = "de.tudarmstadt.ukp.dkpro.core.api.syntax.type.dependency.PCOMP",
+    POBJ = "de.tudarmstadt.ukp.dkpro.core.api.syntax.type.dependency.POBJ",
+    POSS = "de.tudarmstadt.ukp.dkpro.core.api.syntax.type.dependency.POSS",
+    POSSESSIVE = "de.tudarmstadt.ukp.dkpro.core.api.syntax.type.dependency.POSSESSIVE",
+    PRECONJ = "de.tudarmstadt.ukp.dkpro.core.api.syntax.type.dependency.PRECONJ",
+    PRED = "de.tudarmstadt.ukp.dkpro.core.api.syntax.type.dependency.PRED",
+    PREDET = "de.tudarmstadt.ukp.dkpro.core.api.syntax.type.dependency.PREDET",
+    PREP = "de.tudarmstadt.ukp.dkpro.core.api.syntax.type.dependency.PREP",
+    PREPC = "de.tudarmstadt.ukp.dkpro.core.api.syntax.type.dependency.PREPC",
+    PRT = "de.tudarmstadt.ukp.dkpro.core.api.syntax.type.dependency.PRT",
+    PUNCT = "de.tudarmstadt.ukp.dkpro.core.api.syntax.type.dependency.PUNCT",
+    PURPCL = "de.tudarmstadt.ukp.dkpro.core.api.syntax.type.dependency.PURPCL",
+    QUANTMOD = "de.tudarmstadt.ukp.dkpro.core.api.syntax.type.dependency.QUANTMOD",
+    RCMOD = "de.tudarmstadt.ukp.dkpro.core.api.syntax.type.dependency.RCMOD",
+    REF = "de.tudarmstadt.ukp.dkpro.core.api.syntax.type.dependency.REF",
+    REL = "de.tudarmstadt.ukp.dkpro.core.api.syntax.type.dependency.REL",
+    TMOD = "de.tudarmstadt.ukp.dkpro.core.api.syntax.type.dependency.TMOD",
+    XCOMP = "de.tudarmstadt.ukp.dkpro.core.api.syntax.type.dependency.XCOMP",
+    XSUBJ = "de.tudarmstadt.ukp.dkpro.core.api.syntax.type.dependency.XSUBJ",
+}
+
 
 ---Process the response from the component.
 ---@param targetCas any JCas to write the results to
@@ -276,126 +340,14 @@ function process_response(targetCas, results)
 
     for _, dep in ipairs(results.dependencies) do
         local dep_type = dep.dependency_type
-        local DEP_TYPE = string.upper(dep_type)
         local dep_anno_type = "de.tudarmstadt.ukp.dkpro.core.api.syntax.type.dependency.Dependency"
-        if DEP_TYPE == "ROOT" then
-            dep_anno_type = "de.tudarmstadt.ukp.dkpro.core.api.syntax.type.dependency.ROOT"
+
+        local DEP_TYPE = string.upper(dep_type)
+        dep_anno_type = DEP_TYPE_LOOKUP[DEP_TYPE] or dep_anno_type
+        if string.upper(DEP_TYPE) == "ROOT" then
             dep_type = "--"
-        elseif DEP_TYPE == "ABBREV" then
-            dep_anno_type = "de.tudarmstadt.ukp.dkpro.core.api.syntax.type.dependency.ABBREV"
-        elseif DEP_TYPE == "ACOMP" then
-            dep_anno_type = "de.tudarmstadt.ukp.dkpro.core.api.syntax.type.dependency.ACOMP"
-        elseif DEP_TYPE == "ADVCL" then
-            dep_anno_type = "de.tudarmstadt.ukp.dkpro.core.api.syntax.type.dependency.ADVCL"
-        elseif DEP_TYPE == "ADVMOD" then
-            dep_anno_type = "de.tudarmstadt.ukp.dkpro.core.api.syntax.type.dependency.ADVMOD"
-        elseif DEP_TYPE == "AGENT" then
-            dep_anno_type = "de.tudarmstadt.ukp.dkpro.core.api.syntax.type.dependency.AGENT"
-        elseif DEP_TYPE == "AMOD" then
-            dep_anno_type = "de.tudarmstadt.ukp.dkpro.core.api.syntax.type.dependency.AMOD"
-        elseif DEP_TYPE == "APPOS" then
-            dep_anno_type = "de.tudarmstadt.ukp.dkpro.core.api.syntax.type.dependency.APPOS"
-        elseif DEP_TYPE == "ATTR" then
-            dep_anno_type = "de.tudarmstadt.ukp.dkpro.core.api.syntax.type.dependency.ATTR"
-        elseif DEP_TYPE == "AUX0" then
-            dep_anno_type = "de.tudarmstadt.ukp.dkpro.core.api.syntax.type.dependency.AUX0"
-        elseif DEP_TYPE == "AUXPASS" then
-            dep_anno_type = "de.tudarmstadt.ukp.dkpro.core.api.syntax.type.dependency.AUXPASS"
-        elseif DEP_TYPE == "CC" then
-            dep_anno_type = "de.tudarmstadt.ukp.dkpro.core.api.syntax.type.dependency.CC"
-        elseif DEP_TYPE == "CCOMP" then
-            dep_anno_type = "de.tudarmstadt.ukp.dkpro.core.api.syntax.type.dependency.CCOMP"
-        elseif DEP_TYPE == "COMPLM" then
-            dep_anno_type = "de.tudarmstadt.ukp.dkpro.core.api.syntax.type.dependency.COMPLM"
-        elseif DEP_TYPE == "CONJ" then
-            dep_anno_type = "de.tudarmstadt.ukp.dkpro.core.api.syntax.type.dependency.CONJ"
-        elseif DEP_TYPE == "CONJP" then
-            dep_anno_type = "de.tudarmstadt.ukp.dkpro.core.api.syntax.type.dependency.CONJP"
-        elseif DEP_TYPE == "CONJ_YET" then
-            dep_anno_type = "de.tudarmstadt.ukp.dkpro.core.api.syntax.type.dependency.CONJ_YET"
-        elseif DEP_TYPE == "COP" then
-            dep_anno_type = "de.tudarmstadt.ukp.dkpro.core.api.syntax.type.dependency.COP"
-        elseif DEP_TYPE == "CSUBJ" then
-            dep_anno_type = "de.tudarmstadt.ukp.dkpro.core.api.syntax.type.dependency.CSUBJ"
-        elseif DEP_TYPE == "CSUBJPASS" then
-            dep_anno_type = "de.tudarmstadt.ukp.dkpro.core.api.syntax.type.dependency.CSUBJPASS"
-        elseif DEP_TYPE == "DEP" then
-            dep_anno_type = "de.tudarmstadt.ukp.dkpro.core.api.syntax.type.dependency.DEP"
-        elseif DEP_TYPE == "DET" then
-            dep_anno_type = "de.tudarmstadt.ukp.dkpro.core.api.syntax.type.dependency.DET"
-        elseif DEP_TYPE == "DOBJ" then
-            dep_anno_type = "de.tudarmstadt.ukp.dkpro.core.api.syntax.type.dependency.DOBJ"
-        elseif DEP_TYPE == "EXPL" then
-            dep_anno_type = "de.tudarmstadt.ukp.dkpro.core.api.syntax.type.dependency.EXPL"
-        elseif DEP_TYPE == "INFMOD" then
-            dep_anno_type = "de.tudarmstadt.ukp.dkpro.core.api.syntax.type.dependency.INFMOD"
-        elseif DEP_TYPE == "IOBJ" then
-            dep_anno_type = "de.tudarmstadt.ukp.dkpro.core.api.syntax.type.dependency.IOBJ"
-        elseif DEP_TYPE == "MARK" then
-            dep_anno_type = "de.tudarmstadt.ukp.dkpro.core.api.syntax.type.dependency.MARK"
-        elseif DEP_TYPE == "MEASURE" then
-            dep_anno_type = "de.tudarmstadt.ukp.dkpro.core.api.syntax.type.dependency.MEASURE"
-        elseif DEP_TYPE == "MWE" then
-            dep_anno_type = "de.tudarmstadt.ukp.dkpro.core.api.syntax.type.dependency.MWE"
-        elseif DEP_TYPE == "NEG" then
-            dep_anno_type = "de.tudarmstadt.ukp.dkpro.core.api.syntax.type.dependency.NEG"
-        elseif DEP_TYPE == "NN" then
-            dep_anno_type = "de.tudarmstadt.ukp.dkpro.core.api.syntax.type.dependency.NN"
-        elseif DEP_TYPE == "NPADVMOD" then
-            dep_anno_type = "de.tudarmstadt.ukp.dkpro.core.api.syntax.type.dependency.NPADVMOD"
-        elseif DEP_TYPE == "NSUBJ" then
-            dep_anno_type = "de.tudarmstadt.ukp.dkpro.core.api.syntax.type.dependency.NSUBJ"
-        elseif DEP_TYPE == "NSUBJPASS" then
-            dep_anno_type = "de.tudarmstadt.ukp.dkpro.core.api.syntax.type.dependency.NSUBJPASS"
-        elseif DEP_TYPE == "NUM" then
-            dep_anno_type = "de.tudarmstadt.ukp.dkpro.core.api.syntax.type.dependency.NUM"
-        elseif DEP_TYPE == "NUMBER" then
-            dep_anno_type = "de.tudarmstadt.ukp.dkpro.core.api.syntax.type.dependency.NUMBER"
-        elseif DEP_TYPE == "PARATAXIS" then
-            dep_anno_type = "de.tudarmstadt.ukp.dkpro.core.api.syntax.type.dependency.PARATAXIS"
-        elseif DEP_TYPE == "PARTMOD" then
-            dep_anno_type = "de.tudarmstadt.ukp.dkpro.core.api.syntax.type.dependency.PARTMOD"
-        elseif DEP_TYPE == "PCOMP" then
-            dep_anno_type = "de.tudarmstadt.ukp.dkpro.core.api.syntax.type.dependency.PCOMP"
-        elseif DEP_TYPE == "POBJ" then
-            dep_anno_type = "de.tudarmstadt.ukp.dkpro.core.api.syntax.type.dependency.POBJ"
-        elseif DEP_TYPE == "POSS" then
-            dep_anno_type = "de.tudarmstadt.ukp.dkpro.core.api.syntax.type.dependency.POSS"
-        elseif DEP_TYPE == "POSSESSIVE" then
-            dep_anno_type = "de.tudarmstadt.ukp.dkpro.core.api.syntax.type.dependency.POSSESSIVE"
-        elseif DEP_TYPE == "PRECONJ" then
-            dep_anno_type = "de.tudarmstadt.ukp.dkpro.core.api.syntax.type.dependency.PRECONJ"
-        elseif DEP_TYPE == "PRED" then
-            dep_anno_type = "de.tudarmstadt.ukp.dkpro.core.api.syntax.type.dependency.PRED"
-        elseif DEP_TYPE == "PREDET" then
-            dep_anno_type = "de.tudarmstadt.ukp.dkpro.core.api.syntax.type.dependency.PREDET"
-        elseif DEP_TYPE == "PREP" then
-            dep_anno_type = "de.tudarmstadt.ukp.dkpro.core.api.syntax.type.dependency.PREP"
-        elseif DEP_TYPE == "PREPC" then
-            dep_anno_type = "de.tudarmstadt.ukp.dkpro.core.api.syntax.type.dependency.PREPC"
-        elseif DEP_TYPE == "PRT" then
-            dep_anno_type = "de.tudarmstadt.ukp.dkpro.core.api.syntax.type.dependency.PRT"
-        elseif DEP_TYPE == "PUNCT" then
-            dep_anno_type = "de.tudarmstadt.ukp.dkpro.core.api.syntax.type.dependency.PUNCT"
-        elseif DEP_TYPE == "PURPCL" then
-            dep_anno_type = "de.tudarmstadt.ukp.dkpro.core.api.syntax.type.dependency.PURPCL"
-        elseif DEP_TYPE == "QUANTMOD" then
-            dep_anno_type = "de.tudarmstadt.ukp.dkpro.core.api.syntax.type.dependency.QUANTMOD"
-        elseif DEP_TYPE == "RCMOD" then
-            dep_anno_type = "de.tudarmstadt.ukp.dkpro.core.api.syntax.type.dependency.RCMOD"
-        elseif DEP_TYPE == "REF" then
-            dep_anno_type = "de.tudarmstadt.ukp.dkpro.core.api.syntax.type.dependency.REF"
-        elseif DEP_TYPE == "REL" then
-            dep_anno_type = "de.tudarmstadt.ukp.dkpro.core.api.syntax.type.dependency.REL"
-        elseif DEP_TYPE == "ROOT" then
-            dep_anno_type = "de.tudarmstadt.ukp.dkpro.core.api.syntax.type.dependency.ROOT"
-        elseif DEP_TYPE == "TMOD" then
-            dep_anno_type = "de.tudarmstadt.ukp.dkpro.core.api.syntax.type.dependency.TMOD"
-        elseif DEP_TYPE == "XSUBJ" then
-            dep_anno_type = "de.tudarmstadt.ukp.dkpro.core.api.syntax.type.dependency.XSUBJ"
-        elseif DEP_TYPE == "XCOMP" then
-            dep_anno_type = "de.tudarmstadt.ukp.dkpro.core.api.syntax.type.dependency.XCOMP"
         end
+
         local dep_anno = luajava.newInstance(dep_anno_type, targetCas)
         dep_anno:setDependencyType(dep_type)
 
