@@ -1,5 +1,10 @@
-FROM maven:3.8.5-jdk-11
-ADD src src
+FROM maven:3.9.9
+WORKDIR /app/dependencies/
+RUN git clone --depth=1 --branch=dev-uima3 https://github.com/manu-schaaf/heideltimex.git \
+    && cd /app/dependencies/heideltimex/ \
+    && mvn -DskipTests clean install
+
+ADD src/main src/main
 ADD pom.xml pom.xml
-RUN mvn clean compile
-CMD mvn exec:java -Dexec.mainClass="org.texttechnologylab.tools.HeidelTimeExt"
+RUN mvn -DskipTests clean package
+CMD java -cp target/heideltimex-*-jar-with-dependencies.jar org.texttechnologylab.duui.heideltimex.biofid.Component
