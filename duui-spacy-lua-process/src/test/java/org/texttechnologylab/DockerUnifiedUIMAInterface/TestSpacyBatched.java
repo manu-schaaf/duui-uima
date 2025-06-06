@@ -11,9 +11,7 @@ import org.apache.uima.fit.factory.JCasFactory;
 import org.apache.uima.fit.util.JCasUtil;
 import org.apache.uima.jcas.JCas;
 import org.apache.uima.resource.ResourceInitializationException;
-import org.junit.jupiter.api.Disabled;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.TestInstance;
+import org.junit.jupiter.api.*;
 import org.texttechnologylab.DockerUnifiedUIMAInterface.driver.DUUIRemoteDriver;
 import org.texttechnologylab.DockerUnifiedUIMAInterface.lua.DUUILuaContext;
 import org.texttechnologylab.annotation.SpacyAnnotatorMetaData;
@@ -23,10 +21,22 @@ import java.net.URISyntaxException;
 
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 public class TestSpacyBatched {
-    final DockerTestContainerManager container = new DockerTestContainerManager(
-            "docker.texttechnologylab.org/duui-spacy-lua-process:0.2.0",
-            6000
-    );
+    DockerTestContainerManager container;
+
+    @BeforeAll
+    public void beforeAll() {
+        container = new DockerTestContainerManager(
+                "docker.texttechnologylab.org/duui-spacy-lua-process:0.2.2",
+                8000
+        );
+    }
+
+    @AfterAll
+    public void afterAll() throws Exception {
+        if (container != null) {
+            container.close();
+        }
+    }
 
     static class ComposerManager implements AutoCloseable {
         public final DUUIComposer composer;
