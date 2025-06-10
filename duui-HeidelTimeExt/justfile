@@ -1,0 +1,17 @@
+version := "3.0.0"
+
+default:
+    just build "{{version}}"
+    just tag "{{version}}"
+    just push  "{{version}}"
+
+build version=version:
+    docker build . -t duui-heideltimex:{{version}}
+
+tag version=version:
+    docker tag duui-heideltimex:{{version}} docker.texttechnologylab.org/duui-heideltimex:{{version}}
+    docker tag docker.texttechnologylab.org/duui-heideltimex:{{version}} docker.texttechnologylab.org/duui-heideltimex:latest
+
+push version=version:
+    docker push docker.texttechnologylab.org/duui-heideltimex:{{version}}
+    docker push docker.texttechnologylab.org/duui-heideltimex:latest

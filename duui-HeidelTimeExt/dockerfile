@@ -7,4 +7,4 @@ RUN git clone --depth=1 --branch=v3.0.0 https://github.com/manu-schaaf/heideltim
 ADD src/main src/main
 ADD pom.xml pom.xml
 RUN mvn -DskipTests clean package
-CMD java -cp target/heideltimex-*-jar-with-dependencies.jar org.texttechnologylab.duui.heideltimex.biofid.Component
+CMD mvn exec:java
