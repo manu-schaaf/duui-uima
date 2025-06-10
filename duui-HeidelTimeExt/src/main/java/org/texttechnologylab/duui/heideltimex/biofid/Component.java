@@ -84,13 +84,14 @@ public class Component implements AutoCloseable {
             server.setExecutor(java.util.concurrent.Executors.newCachedThreadPool());
         }
         server.start();
-        logger.info("Server Running");
+        logger.info("Started HeidelTimeX Server with Executor: {}", server.getExecutor().toString());
         return server;
     }
 
     @Override
     public void close() throws Exception {
         if (server != null) {
+            logger.info("Shutting Down HeidelTimeX Server");
             server.stop(0);
         }
     }

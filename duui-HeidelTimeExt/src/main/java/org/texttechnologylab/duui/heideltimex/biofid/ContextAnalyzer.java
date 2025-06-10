@@ -369,7 +369,6 @@ public class ContextAnalyzer {
         for (Integer tokEnd : tmToken.keySet()) {
             if (tokEnd < timex.getBegin()) {
                 Token token = tmToken.get(tokEnd);
-                System.out.println("GET LAST TENSE: string:" + token.getCoveredText() + " pos:" + token.getPosValue());
                 Logger.printDetail("GET LAST TENSE: string:" + token.getCoveredText() + " pos:" + token.getPosValue());
                 Logger.printDetail(
                     "hmAllRePattern.containsKey(tensePos4PresentFuture):" + rpm.get("tensePos4PresentFuture")

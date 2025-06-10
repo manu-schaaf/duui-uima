@@ -179,26 +179,25 @@ public class HeidelTimeBIOfid extends JCasAnnotator_ImplBase {
         // run preprocessing processors
         procMan.executeProcessors(jcas, Priority.PREPROCESSING);
 
-        String requestedLocale = null;
         try {
             switch (jcas.getDocumentLanguage()) {
-                case "en":
-                    Locale locale;
-                    locale = DateCalculator.getLocaleFromString("en");
+                case String lang when lang.toLowerCase().startsWith("en") -> {
+                    Locale locale = DateCalculator.getLocaleFromString("en");
                     Locale.setDefault(locale);
                     language = Language.ENGLISH;
-                    break;
-                case "de":
-                    Locale localede = DateCalculator.getLocaleFromString("de");
-                    Locale.setDefault(localede);
+                }
+                case String lang when lang.toLowerCase().startsWith("de") -> {
+                    Locale locale = DateCalculator.getLocaleFromString("de");
+                    Locale.setDefault(locale);
                     language = Language.GERMAN;
-                default:
-                    break;
+                }
+                default -> {
+                    language = Language.GERMAN;
+                }
             }
-        } catch (LocaleException e1) {
-            // TODO Auto-generated catch block
-            e1.printStackTrace();
-            language = Language.ENGLISH;
+        } catch (LocaleException e) {
+            Logger.printError(e.getMessage());
+            language = Language.GERMAN;
         }
 
         RuleManager rulem = RuleManager.getInstance(language, find_temponyms);
@@ -444,16 +443,16 @@ public class HeidelTimeBIOfid extends JCasAnnotator_ImplBase {
         this.timex_counter++;
 
         Logger.printDetail(
-            annotation.getTimexId() +
             "EXTRACTION PHASE:   " +
+            annotation.getTimexId() +
             " found by:" +
             annotation.getFoundByRule() +
             " text:" +
             annotation.getCoveredText()
         );
         Logger.printDetail(
-            annotation.getTimexId() +
             "NORMALIZATION PHASE:" +
+            annotation.getTimexId() +
             " found by:" +
             annotation.getFoundByRule() +
             " text:" +
@@ -489,10 +488,10 @@ public class HeidelTimeBIOfid extends JCasAnnotator_ImplBase {
             Timex3 t_i = (Timex3) linearDates.get(i);
             String value_i = t_i.getTimexValue();
             String newValue = value_i;
-            Boolean change = false;
+            boolean change = false;
             if (!(t_i.getFoundByRule().contains("-BCADhint"))) {
                 if (value_i.startsWith("0")) {
-                    Integer offset = 1, counter = 1;
+                    int offset = 1, counter = 1;
                     do {
                         if (
                             (i == 1 || (i > 1 && !change)) &&
@@ -606,8 +605,8 @@ public class HeidelTimeBIOfid extends JCasAnnotator_ImplBase {
             timex3.removeFromIndexes();
             this.timex_counter--;
             Logger.printDetail(
-                timex3.getTimexId() +
                 " REMOVING PHASE: " +
+                timex3.getTimexId() +
                 "found by:" +
                 timex3.getFoundByRule() +
                 " text:" +
@@ -2718,7 +2717,7 @@ public class HeidelTimeBIOfid extends JCasAnnotator_ImplBase {
             int tokenEnd = s.getBegin() + m.end(groupNumber);
             String pos = mr.group(2);
             String pos_as_is = getPosFromMatchResult(tokenBegin, tokenEnd, s, jcas);
-            if (pos_as_is.matches(pos)) {
+            if (Objects.nonNull(pos_as_is) && pos_as_is.matches(pos)) {
                 Logger.printDetail("POS CONSTRAINT IS VALID: pos should be " + pos + " and is " + pos_as_is);
             } else {
                 return false;
