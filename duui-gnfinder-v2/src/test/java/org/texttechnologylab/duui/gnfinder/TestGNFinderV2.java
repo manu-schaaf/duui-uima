@@ -14,7 +14,7 @@ import org.texttechnologylab.annotation.biofid.gnfinder.MetaData;
 import org.texttechnologylab.annotation.biofid.gnfinder.Taxon;
 
 public class TestGNFinderV2 {
-    final static String DOCKER_IMAGE = "docker.texttechnologylab.org/duui-gnfinder-v2:0.1.4";
+    final static String DOCKER_IMAGE = "docker.texttechnologylab.org/duui-gnfinder-v2:0.1.5";
 
     private static JCas getJCas() throws ResourceInitializationException, CASException {
         JCas jCas = JCasFactory.createJCas();
