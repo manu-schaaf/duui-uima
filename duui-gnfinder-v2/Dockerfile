@@ -9,5 +9,5 @@ COPY --from=docker.io/gnames/gnfinder:latest /bin/gnfinder /bin/gnfinder
 WORKDIR /app
 COPY src/main/ /app/
 
-ENTRYPOINT ["uv", "run", "uvicorn", "wsgi:app", "--host", "0.0.0.0", "--port" ,"9714", "--use-colors"]
+ENTRYPOINT ["sh", "entrypoint.sh"]
 CMD ["--workers", "1"]

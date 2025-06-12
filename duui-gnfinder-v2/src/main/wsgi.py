@@ -1,55 +1,41 @@
-import asyncio
-import os
-import shutil
+import logging
 from contextlib import asynccontextmanager
-from pathlib import Path
 from typing import Annotated, Any, Final, Literal, Optional, Self
 
 import httpx
+import uvicorn
 from fastapi import FastAPI, HTTPException, Request
+from fastapi.logger import logger
 from fastapi.responses import PlainTextResponse
 from pydantic import UUID5, BaseModel, Field
 
-GNFINDER_PATH: Final[Path] = Path(
-    os.environ.get("GNFINDER_PATH", shutil.which("gnfinder"))
-)
-STARTUP_DELAY: Final[int] = int(os.environ.get("STARTUP_DELAY", "2"))
+LOGGING_CONFIG: Final[dict] = uvicorn.config.LOGGING_CONFIG  # type: ignore
+LOGGING_CONFIG["loggers"][""] = {
+    "handlers": ["default"],
+    "level": "INFO",
+    "propagate": False,
+}
+logging.config.dictConfig(LOGGING_CONFIG)  # type: ignore
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    gnfinder_process = await asyncio.create_subprocess_exec(GNFINDER_PATH, "-p", "8999")
-    try:
-        # Wait for the gnfinder server to start
-        # If the server exits during this time, raise a RuntimeError
-        async with asyncio.timeout(STARTUP_DELAY):
-            exit_code = await gnfinder_process.wait()
-            if exit_code:
-                raise RuntimeError(
-                    f"GNFinder server exited unexpectedly with code {exit_code}"
-                )
-    except TimeoutError:
-        pass
-
+    # workers spawned after the main process should only connect to the already running GNFinder server
     async with httpx.AsyncClient(base_url="http://localhost:8999/") as gnfinder_client:
         try:
             (await gnfinder_client.get("api/v1/ping")).raise_for_status()
-        except httpx.HTTPStatusError as e:
+            logger.info("Connected to running GNFinder server")
+            yield {"gnfinder_client": gnfinder_client}
+        except httpx.ConnectError as e:
             raise HTTPException(
                 status_code=httpx.codes.SERVICE_UNAVAILABLE,
-                detail="Could not connect to GNFinder server",
+                detail="GNFinder server is not running",
             ) from e
-
-        yield {
-            "gnfinder_process": gnfinder_process,
-            "gnfinder_client": gnfinder_client,
-        }
-
-    try:
-        gnfinder_process.terminate()
-    except ProcessLookupError:
-        # Expected during shutdown, process already terminated by context manager
-        pass
+        except httpx.HTTPStatusError as e:
+            raise HTTPException(
+                status_code=httpx.codes.INTERNAL_SERVER_ERROR,
+                detail=f"Error while connecting to GNFinder server: {e}",
+            ) from e
 
 
 app = FastAPI(lifespan=lifespan)
@@ -282,6 +268,26 @@ class FinderResultData(BaseModel):
         ),
     ]
 
+    sortScore: Annotated[
+        float,
+        Field(
+            description="""SortScore is a numeric representation of the whole score.
+It can be used to find the BestMatch overall, as well as the
+best match for every data-source.
+
+SortScore takes data from all other scores, using the priority
+sequence from highest to lowest: InfraSpecificRankScore, FuzzyLessScore,
+CuratedDataScore, AuthorMatchScore, AcceptedNameScore,
+ParsingQualityScore. Every highest priority trumps everything below.
+When the final score value is calculated, it is used to
+sort verification or search results.
+
+Comparing this score between results of different verifications will
+not necessary be accurate. The score is used for comparison of names
+from the same result."""
+        ),
+    ]
+
     matchedName: Annotated[
         str, Field(description="A verbatim scientfic name matched to the input.")
     ]
@@ -339,6 +345,13 @@ class FinderResultData(BaseModel):
         ),
     ]
 
+    taxonomicStatus: Annotated[
+        Literal["Accepted", "Synonym", "N/A"],
+        Field(
+            description='TaxonomicStatus provides taxonomic status of a name. Can be "Accepted", "Synonym", "N/A".'
+        ),
+    ]
+
     isSynonym: Annotated[
         bool,
         Field(
@@ -365,7 +378,7 @@ class FinderResultData(BaseModel):
         ),
     ]
 
-    editDistanceStem: Optional[
+    stemEditDistance: Optional[
         Annotated[
             int,
             Field(
@@ -507,7 +520,7 @@ class FinderName(BaseModel):
         ),
     ]
 
-    offsetEnd: Optional[
+    end: Optional[
         Annotated[
             int,
             Field(
@@ -595,11 +608,20 @@ class TaxonVerifiedType(TaxonType):
 
     @classmethod
     def from_finder(cls, name: FinderName, data: FinderResultData) -> Self:
+        if data.localId and data.outlink and data.localId not in data.outlink:
+            # if present, the local ID is appended to the outlink to create a unique identifier
+            identifier = data.outlink + data.localId
+        elif data.outlink:
+            # if only an outlink is present, it alone is used as identifier
+            identifier = data.outlink
+        else:
+            identifier = data.recordId
+
         return cls(
             begin=name.start,
-            end=name.offsetEnd if name.offsetEnd else name.start + len(name.verbatim),
+            end=name.end if name.end else name.start + len(name.name),
             value=name.name,
-            identifier=data.outlink if data.outlink else data.recordId,
+            identifier=identifier,
             cardinality=name.cardinality,
             oddsLog10=name.oddsLog10,
             oddsDetails=name.oddsDetails,
@@ -608,7 +630,7 @@ class TaxonVerifiedType(TaxonType):
             globalId=data.globalId,
             localId=data.localId,
             outlink=data.outlink,
-            sortScore=data.scoreDetails.infraSpecificRankScore,
+            sortScore=data.sortScore or 0.0,
             matchedName=data.matchedName,
             currentName=data.currentName,
             matchedCanonicalSimple=data.matchedCanonicalSimple,
@@ -683,11 +705,7 @@ async def v1_process(
             results.append(
                 TaxonType(
                     begin=name.start,
-                    end=(
-                        name.offsetEnd
-                        if name.offsetEnd
-                        else name.start + len(name.verbatim)
-                    ),
+                    end=(name.end if name.end else name.start + len(name.verbatim)),
                     value=name.name,
                     identifier="",
                     cardinality=name.cardinality,
