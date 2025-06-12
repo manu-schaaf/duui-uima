@@ -81,8 +81,12 @@ REQUEST_BATCH_SIZE = 1024
 ---@param targetCas any JCas (view) to write the results to (optional)
 function process(sourceCas, handler, parameters, targetCas)
     parameters = parameters or {}
+    local language = sourceCas:getDocumentLanguage()
+    if language == nil or language == "" or language == "x-unspecified" then
+        language = parameters.spacy_language
+    end
     local config = {
-        spacy_language = sourceCas:getDocumentLanguage(),
+        spacy_language = language,
         spacy_model_size = parameters.spacy_model_size or "lg",
         spacy_batch_size = tonumber(parameters.spacy_batch_size) or 32,
         spacy_disable = split_comma(parameters.spacy_disable or ""),
