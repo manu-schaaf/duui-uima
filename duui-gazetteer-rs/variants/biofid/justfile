@@ -1,0 +1,25 @@
+VERSION := "1.7.1"
+
+default version=VERSION:
+    just biofid "{{version}}"
+    just gbif_backbone "{{version}}"
+    just catalogue_of_life "{{version}}"
+
+biofid version=VERSION:
+    docker build --build-arg VERSION="{{version}}" -f docker/biofid.Dockerfile -t duui-gazetteer-rs/biofid:{{version}} .
+    just _push "duui-gazetteer-rs/biofid" "{{version}}" "{{version}}"
+    just _push "duui-gazetteer-rs/biofid" "{{version}}" "latest"
+
+gbif_backbone version=VERSION:
+    docker build --build-arg VERSION="{{version}}" -f docker/gbif_backbone.Dockerfile -t duui-gazetteer-rs/biofid/gbif_backbone:{{version}} .
+    just _push "duui-gazetteer-rs/biofid/gbif_backbone" "{{version}}" "{{version}}"
+    just _push "duui-gazetteer-rs/biofid/gbif_backbone" "{{version}}" "latest"
+
+catalogue_of_life version=VERSION:
+    docker build --build-arg VERSION="{{version}}" -f docker/catalogue_of_life.Dockerfile -t duui-gazetteer-rs/biofid/catalogue_of_life:{{version}} .
+    just _push "duui-gazetteer-rs/biofid/catalogue_of_life" "{{version}}" "{{version}}"
+    just _push "duui-gazetteer-rs/biofid/catalogue_of_life" "{{version}}" "latest"
+
+_push image version=VERSION as=VERSION:
+    docker image tag {{image}}:{{version}} docker.texttechnologylab.org/{{image}}:{{as}}
+    docker push docker.texttechnologylab.org/{{image}}:{{as}}

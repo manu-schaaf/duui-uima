@@ -1,0 +1,8 @@
+VERSION := "1.7.1"
+
+base version=VERSION:
+    docker build --build-arg VERSION="v{{VERSION}}" -t gazetteer-rs/base:{{VERSION}} .
+    docker image tag gazetteer-rs/base:{{VERSION}} docker.texttechnologylab.org/gazetteer-rs/base:latest
+    docker image tag gazetteer-rs/base:{{VERSION}} docker.texttechnologylab.org/gazetteer-rs/base:{{VERSION}}
+    docker push docker.texttechnologylab.org/gazetteer-rs/base:latest
+    docker push docker.texttechnologylab.org/gazetteer-rs/base:{{VERSION}}

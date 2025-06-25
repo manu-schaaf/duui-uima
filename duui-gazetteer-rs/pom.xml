@@ -6,11 +6,11 @@
 
     <groupId>org.hucompute.textimager.uima.rust</groupId>
     <artifactId>gazetteer-rs</artifactId>
-    <version>0.0.1</version>
+    <version>1.7.1</version>
 
     <properties>
-        <maven.compiler.source>11</maven.compiler.source>
-        <maven.compiler.target>11</maven.compiler.target>
+        <maven.compiler.source>21</maven.compiler.source>
+        <maven.compiler.target>21</maven.compiler.target>
         <ttlab.duui.version>f68ca579ab553074f76d061623dc9b00cf508276</ttlab.duui.version>
         <ttlab.textimager.typesystem.version>b10db8275163d19d63b9512cc20ca5872e52499b</ttlab.textimager.typesystem.version>
         <ttlab.typesystem.version>29fe3e0ab56c14b1e8af402b3df25d91e1f41d94</ttlab.typesystem.version>
