@@ -5,7 +5,7 @@
     <modelVersion>4.0.0</modelVersion>
 
     <groupId>org.texttechnologylab.duui</groupId>
-    <artifactId>heideltimex</artifactId>
+    <artifactId>heideltimex-biofid</artifactId>
     <version>3.0.0</version>
 
     <repositories>
