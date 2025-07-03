@@ -11,6 +11,7 @@ default version=version:
     just eu {{version}}
     just europe {{version}}
     just europe-central {{version}}
+    just world {{version}}
 
 _build version=version variant="de" dockerfile="src/main/docker/single.Dockerfile":
     docker build -f {{dockerfile}} -t duui-geonames-fst/{{variant}}:{{version}} --build-arg GEONAMES_FST_VERSION={{fst_version}} --build-arg COUNTRY={{uppercase(variant)}} .
@@ -43,3 +44,8 @@ europe-central version=version:
     just _build {{version}} "europe-central" "src/main/docker/europe-central.Dockerfile"
     just _tag {{version}} "europe-central"
     just _push {{version}} "europe-central"
+
+world version=version:
+    just _build {{version}} "world" "src/main/docker/world.Dockerfile"
+    just _tag {{version}} "world"
+    just _push {{version}} "world"
