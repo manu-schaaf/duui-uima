@@ -2,7 +2,6 @@ package org.texttechnologylab.textimager.uima.rust;
 
 import de.tudarmstadt.ukp.dkpro.core.api.ner.type.Location;
 import org.apache.uima.cas.CASException;
-import org.apache.uima.cas.SelectFSs;
 import org.apache.uima.fit.factory.JCasFactory;
 import org.apache.uima.jcas.JCas;
 import org.apache.uima.resource.ResourceInitializationException;
@@ -23,6 +22,11 @@ public class TestGeoNamesFst {
         );
         jCas.setDocumentLanguage("de");
 
+        return jCas;
+    }
+
+    private static JCas getJCasWithLocations() throws ResourceInitializationException, CASException {
+        JCas jCas = getJCas();
         ArrayList<Location> locations = new ArrayList<>();
         locations.add(new Location(jCas, 0, 17));
         locations.add(new Location(jCas, 36, 47));
@@ -32,6 +36,32 @@ public class TestGeoNamesFst {
         locations.add(new Location(jCas, 163, 191));
         locations.forEach(ne -> ne.addToIndexes(jCas));
         return jCas;
+    }
+
+    @Test
+    public void test_empty() throws Exception {
+        DUUIComposer composer = new DUUIComposer()
+                .withLuaContext(
+                        new DUUILuaContext()
+                                .withJsonLibrary()
+                )
+                .withSkipVerification(true);
+
+        composer.addDriver(new DUUIRemoteDriver(10000));
+        composer.add(
+                new DUUIRemoteDriver.Component("http://localhost:9714")
+                        .withName("duui-geonames-fst")
+        );
+
+        JCas jCas = getJCas();
+        composer.run(jCas);
+        assert jCas.select(GeoNamesEntity.class).toList().isEmpty();
+
+        jCas = JCasFactory.createJCas();
+        composer.run(jCas);
+        assert jCas.select(GeoNamesEntity.class).toList().isEmpty();
+
+        composer.shutdown();
     }
 
     @Test
@@ -49,7 +79,7 @@ public class TestGeoNamesFst {
                         .withName("duui-geonames-fst")
         );
 
-        JCas jCas = getJCas();
+        JCas jCas = getJCasWithLocations();
         composer.run(jCas);
         composer.shutdown();
 
@@ -80,7 +110,7 @@ public class TestGeoNamesFst {
                         .withParameter("result_selection", "first")
         );
 
-        JCas jCas = getJCas();
+        JCas jCas = getJCasWithLocations();
         composer.run(jCas);
         composer.shutdown();
 
@@ -116,7 +146,7 @@ public class TestGeoNamesFst {
                         .withParameter("result_selection", "first")
         );
 
-        JCas jCas = getJCas();
+        JCas jCas = getJCasWithLocations();
         composer.run(jCas);
         composer.shutdown();
 
@@ -152,7 +182,7 @@ public class TestGeoNamesFst {
                         .withParameter("result_selection", "first")
         );
 
-        JCas jCas = getJCas();
+        JCas jCas = getJCasWithLocations();
         composer.run(jCas);
         composer.shutdown();
 
