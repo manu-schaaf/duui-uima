@@ -33,6 +33,7 @@ import org.json.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.texttechnologylab.annotation.type.Time;
+import org.texttechnologylab.heideltime.HeidelTimeX;
 import org.xml.sax.SAXException;
 
 public class Component implements AutoCloseable {
@@ -106,7 +107,7 @@ public class Component implements AutoCloseable {
                 jCas = JCasFactory.createJCas();
 
                 AggregateBuilder pipeline = new AggregateBuilder();
-                pipeline.add(createEngineDescription(HeidelTimeBIOfid.class));
+                pipeline.add(createEngineDescription(HeidelTimeX.class));
                 analysisEngine = pipeline.createAggregate();
             } catch (UIMAException e) {
                 throw new RuntimeException(e);

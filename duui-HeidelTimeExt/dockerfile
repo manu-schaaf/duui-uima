@@ -1,6 +1,6 @@
 FROM maven:3.9.9
 WORKDIR /app/dependencies/
-RUN git clone --depth=1 --branch=v3.0.1 https://github.com/manu-schaaf/heideltimex.git \
+RUN git clone --depth=1 --branch=v4.0.0 https://github.com/manu-schaaf/heideltimex.git \
     && cd /app/dependencies/heideltimex/ \
     && mvn -DskipTests clean install
 
