@@ -92,7 +92,7 @@ function process(sourceCas, handler, parameters, targetCas)
         if not response:ok() then
             error("Error " .. response:statusCode() .. " in communication with component: " .. response:bodyAsString())
         end
-    
+
         results = json.decode(response:body())
         process_response(targetCas, results, references)
         modification = results.modification or modification
@@ -114,14 +114,19 @@ end
 function process_response(targetCas, results, references)
     for _, entity in ipairs(results.results) do
         local gn = entity.entry
-        
+
         local annotation = luajava.newInstance("org.texttechnologylab.annotation.geonames.GeoNamesEntity", targetCas)
         annotation:setId(tonumber(gn.id))
         annotation:setName(gn.name)
         annotation:setLatitude(gn.latitude)
         annotation:setLongitude(gn.longitude)
-        annotation:setFeatureClass(gn.feature_class)
-        annotation:setFeatureCode(gn.feature_code)
+        -- Feature Class & Feature Code are enum strings and will cause an error if set to an empty string
+        if gn.feature_class ~= nil and gn.feature_class ~= "" then
+            annotation:setFeatureClass(gn.feature_class)
+        end
+        if gn.feature_code ~= nil and gn.feature_code ~= "" then
+            annotation:setFeatureCode(gn.feature_code)
+        end
         annotation:setCountryCode(gn.country_code)
         annotation:setAdm1(gn.adm1)
         annotation:setAdm2(gn.adm2)

@@ -1,4 +1,4 @@
-version := "0.4.0"
+version := "0.4.1"
 fst_version := "0.4.0"
 
 # runs: just country de, just eu, just europe, just europe-central
