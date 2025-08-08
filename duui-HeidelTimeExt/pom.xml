@@ -147,7 +147,7 @@
         <dependency>
             <groupId>org.texttechnologylab</groupId>
             <artifactId>heideltimex</artifactId>
-            <version>4.0.0</version>
+            <version>4.0.1</version>
         </dependency>
 
         <dependency>
