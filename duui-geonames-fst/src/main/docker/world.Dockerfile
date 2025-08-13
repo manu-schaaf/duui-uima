@@ -1,4 +1,4 @@
-ARG GEONAMES_FST_VERSION=0.4.2
+ARG GEONAMES_FST_VERSION=0.4.3
 FROM docker.texttechnologylab.org/duui-geonames-fst/base:${GEONAMES_FST_VERSION} AS builder
 
 WORKDIR /build/
@@ -26,5 +26,5 @@ WORKDIR /app/
 ENV RUST_LOG="info,tower_http=debug,axum::rejection=trace"
 
 EXPOSE 9714
-ENTRYPOINT ["/app/geonames-fst", "--port", "9714", "/app/data/geonames/", "--alternate", "/app/data/alternateNames/", "--timestamp", "/app/data/geonames_timestamp.txt"]
+ENTRYPOINT ["/app/geonames-fst", "--port", "9714", "/app/data/geonames/", "--alternate", "/app/data/alternateNames/", "--all-languages", "--timestamp", "/app/data/geonames_timestamp.txt"]
 CMD ["--workers", "1"]

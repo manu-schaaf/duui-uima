@@ -1,4 +1,4 @@
-ARG GEONAMES_FST_VERSION=0.4.2
+ARG GEONAMES_FST_VERSION=0.4.3
 FROM docker.texttechnologylab.org/duui-geonames-fst/base:${GEONAMES_FST_VERSION} AS builder
 
 WORKDIR /build/

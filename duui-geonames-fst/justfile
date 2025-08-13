@@ -1,5 +1,5 @@
-version := "0.4.2"
-fst_version := "0.4.2"
+version := "0.4.3"
+fst_version := "0.4.3"
 
 # runs: just country de, just eu, just europe, just europe-central
 default version=version:
@@ -13,7 +13,7 @@ default version=version:
     just europe-central {{version}}
     just world {{version}}
 
-_build version=version variant="de" dockerfile="src/main/docker/single.Dockerfile":
+_build version=version variant="de" dockerfile="src/main/docker/country.Dockerfile":
     docker build -f {{dockerfile}} -t duui-geonames-fst/{{variant}}:{{version}} --build-arg GEONAMES_FST_VERSION={{fst_version}} --build-arg COUNTRY={{uppercase(variant)}} .
     docker tag duui-geonames-fst/{{variant}}:{{version}} duui-geonames-fst/{{variant}}:latest
 
@@ -26,7 +26,7 @@ _push version=version variant="de":
     docker push docker.texttechnologylab.org/duui-geonames-fst/{{variant}}:latest
 
 country country="de" version=version:
-    just _build {{version}} {{country}} "src/main/docker/single.Dockerfile"
+    just _build {{version}} {{country}} "src/main/docker/country.Dockerfile"
     just _tag {{version}} {{country}}
     just _push {{version}} {{country}}
 
@@ -49,3 +49,10 @@ world version=version:
     just _build {{version}} "world" "src/main/docker/world.Dockerfile"
     just _tag {{version}} "world"
     just _push {{version}} "world"
+
+    docker tag duui-geonames-fst/world:{{version}} docker.texttechnologylab.org/duui-geonames-fst/all:{{version}}
+    docker tag duui-geonames-fst/world:{{version}} docker.texttechnologylab.org/duui-geonames-fst/all:latest
+    just _push {{version}} "all"
+
+all-countries:
+    parallel -j4 --bar "just country" ::: ad ae af ag ai al am an ao aq ar as at au aw ax az ba bb bd be bf bg bh bi bj bl bm bn bo bq br bs bt bv bw by bz ca cc cd cf cg ch ci ck cl cm cn co cr cs cu cv cw cx cy cz de dj dk dm do dz ec ee eg eh er es et fi fj fk fm fo fr ga gb gd ge gf gg gh gi gl gm gn gp gq gr gs gt gu gw gy hk hm hn hr ht hu id ie il im in io iq ir is it je jm jo jp ke kg kh ki km kn kp kr kw ky kz la lb lc li lk lr ls lt lu lv ly ma mc md me mf mg mh mk ml mm mn mo mp mq mr ms mt mu mv mw mx my mz na nc ne nf ng ni nl no np nr nu nz om pa pe pf pg ph pk pl pm pn pr ps pt pw py qa re ro rs ru rw sa sb sc sd se sg sh si sj sk sl sm sn so sr ss st sv sx sy sz tc td tf tg th tj tk tl tm tn to tr tt tv tw tz ua ug um us uy uz va vc ve vg vi vn vu wf ws xk ye yt yu za zm zw
