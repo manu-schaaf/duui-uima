@@ -1,4 +1,4 @@
-ARG GEONAMES_FST_VERSION=0.4.0
+ARG GEONAMES_FST_VERSION=0.4.2
 FROM docker.texttechnologylab.org/duui-geonames-fst/base:${GEONAMES_FST_VERSION} AS builder
 
 WORKDIR /build/
@@ -34,7 +34,9 @@ RUN mkdir -p /data/geonames /data/alternateNames && \
     for COUNTRY in CZ DK DE GB HU IE PL SK SL; do \
         unzip -d /data/geonames/ /tmp/geonames/$COUNTRY.zip $COUNTRY.txt; \
         unzip -d /data/alternateNames/ /tmp/alternateNames/$COUNTRY.zip $COUNTRY.txt; \
-    done
+    done && \
+    stat -c %y /data/geonames/* | sort -r | head -n 1 > /data/geonames_timestamp.txt && \
+    gzip -9 /data/geonames/* /data/alternateNames/*
 
 FROM cgr.dev/chainguard/glibc-dynamic:latest AS prod
 COPY --from=builder /build/target/release/geonames-fst /app/
@@ -45,5 +47,5 @@ WORKDIR /app/
 ENV RUST_LOG="info,tower_http=debug,axum::rejection=trace"
 
 EXPOSE 9714
-ENTRYPOINT ["/app/geonames-fst", "--port", "9714", "/app/data/geonames/", "--alternate", "/app/data/alternateNames/"]
+ENTRYPOINT ["/app/geonames-fst", "--port", "9714", "/app/data/geonames/", "--alternate", "/app/data/alternateNames/", "--timestamp", "/app/data/geonames_timestamp.txt"]
 CMD ["--workers", "1"]

@@ -1,4 +1,4 @@
-ARG GEONAMES_FST_VERSION=0.4.0
+ARG GEONAMES_FST_VERSION=0.4.2
 FROM docker.texttechnologylab.org/duui-geonames-fst/base:${GEONAMES_FST_VERSION} AS builder
 
 WORKDIR /build/
@@ -8,14 +8,14 @@ RUN chmod +x /build/target/release/geonames-fst
 FROM alpine:latest AS data
 RUN apk --update add unzip && rm -rf /var/cache/apk/*
 
-ADD https://download.geonames.org/export/dump/allCountries.zip /data/geonames/
-ADD https://download.geonames.org/export/dump/alternateNames.zip /data/alternateNames/
+ADD https://download.geonames.org/export/dump/allCountries.zip /tmp/geonames/
+ADD https://download.geonames.org/export/dump/alternateNames.zip /tmp/alternateNames/
 
-WORKDIR /data/geonames
-RUN unzip allCountries.zip && rm -f allCountries.zip readme.txt
-
-WORKDIR /data/alternateNames
-RUN unzip alternateNames.zip && rm -f alternateNames.zip readme.txt iso-languagecodes.txt
+RUN mkdir -p /data/geonames/ /data/alternateNames/ && \
+    unzip -d /data/geonames/ /tmp/geonames/allCountries.zip allCountries.txt && \
+    unzip -d /data/alternateNames/ /tmp/alternateNames/alternateNames.zip alternateNames.txt && \
+    stat -c %y /data/geonames/* | sort -r | head -n 1 > /data/geonames_timestamp.txt && \
+    gzip -9 /data/geonames/* /data/alternateNames/*
 
 FROM cgr.dev/chainguard/glibc-dynamic:latest AS prod
 COPY --from=builder /build/target/release/geonames-fst /app/
@@ -26,5 +26,5 @@ WORKDIR /app/
 ENV RUST_LOG="info,tower_http=debug,axum::rejection=trace"
 
 EXPOSE 9714
-ENTRYPOINT ["/app/geonames-fst", "--port", "9714", "/app/data/geonames/", "--alternate", "/app/data/alternateNames/"]
+ENTRYPOINT ["/app/geonames-fst", "--port", "9714", "/app/data/geonames/", "--alternate", "/app/data/alternateNames/", "--timestamp", "/app/data/geonames_timestamp.txt"]
 CMD ["--workers", "1"]
