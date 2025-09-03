@@ -67,6 +67,7 @@ function process(sourceCas, handler, parameters, targetCas)
         result_selection = parameters.result_selection or "first",
     }
 
+    ---parameters.filter should be a table with keys (any of), each holding a single string: feature_class, feature_code, country_code
     if parameters.filter ~= nil then
         query.filter = parameters.filter
     end
