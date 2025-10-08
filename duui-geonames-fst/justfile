@@ -1,5 +1,5 @@
-version := "0.4.3"
-fst_version := "0.4.3"
+version := "0.4.4"
+fst_version := "0.4.4"
 
 # runs: just country de, just eu, just europe, just europe-central
 default version=version:
