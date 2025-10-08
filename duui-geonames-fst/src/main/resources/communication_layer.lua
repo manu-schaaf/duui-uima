@@ -64,6 +64,7 @@ function process(sourceCas, handler, parameters, targetCas)
 
     local query = {
         mode = parameters.mode or "find",
+        class_order = parameters.class_order or "P,A,H,T,V,L,S,R,U",
         result_selection = parameters.result_selection or "first",
     }
 
@@ -72,8 +73,13 @@ function process(sourceCas, handler, parameters, targetCas)
         query.filter = parameters.filter
     end
 
-    if query.mode ~= "find" and parameters.max_dist ~= nil then
-        query.max_dist = tostring(parameters.max_dist)
+    if query.mode ~= "find" then
+        if parameters.max_dist ~= nil then
+            query.max_dist = tostring(parameters.max_dist)
+        end
+        if parameters.min_length ~= nil then
+            query.min_length = tostring(parameters.min_length)
+        end
     end
 
     if query.mode == "levenshtein" and parameters.state_limit ~= nil then
