@@ -83,14 +83,16 @@ public class TestGeoNamesFst {
         composer.run(jCas);
         composer.shutdown();
 
+        System.out.println("### TestGeoNamesFst.test_find ###");
         List<GeoNamesEntity> annotations = jCas.select(GeoNamesEntity.class).toList();
-        assert annotations.size() == 3;
         for (GeoNamesEntity gn : annotations) {
             StringBuffer stringBuffer = new StringBuffer();
             gn.prettyPrint(0, 2, stringBuffer, true);
             System.out.print(stringBuffer);
             System.out.println("\n  text: \"" + gn.getCoveredText() + "\"\n");
         }
+        // Returns 4 annotations as of 2025-10-08 due to an update of GeoNames that now includes: https://www.geonames.org/13521977/hessens.html
+        assert annotations.size() == 4;
     }
 
     @Test
@@ -114,14 +116,16 @@ public class TestGeoNamesFst {
         composer.run(jCas);
         composer.shutdown();
 
+        System.out.println("### TestGeoNamesFst.test_find_explicit ###");
         List<GeoNamesEntity> annotations = jCas.select(GeoNamesEntity.class).toList();
-        assert annotations.size() == 3;
         for (GeoNamesEntity gn : annotations) {
             StringBuffer stringBuffer = new StringBuffer();
             gn.prettyPrint(0, 2, stringBuffer, true);
             System.out.print(stringBuffer);
             System.out.println("\n  text: \"" + gn.getCoveredText() + "\"\n");
         }
+        // Returns 4 annotations as of 2025-10-08 due to an update of GeoNames that now includes "Hessens"
+        assert annotations.size() == 4;
     }
 
     /**
@@ -150,6 +154,7 @@ public class TestGeoNamesFst {
         composer.run(jCas);
         composer.shutdown();
 
+        System.out.println("### TestGeoNamesFst.test_levenshtein ###");
         List<GeoNamesEntity> annotations = jCas.select(GeoNamesEntity.class).toList();
         assert annotations.size() == 6;
         for (GeoNamesEntity gn : annotations) {
@@ -186,6 +191,7 @@ public class TestGeoNamesFst {
         composer.run(jCas);
         composer.shutdown();
 
+        System.out.println("### TestGeoNamesFst.test_levenshtein_state_limit ###");
         List<GeoNamesEntity> annotations = jCas.select(GeoNamesEntity.class).toList();
         assert annotations.size() == 1;
         for (GeoNamesEntity gn : annotations) {
