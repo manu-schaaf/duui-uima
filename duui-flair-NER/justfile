@@ -1,0 +1,19 @@
+version := "0.2.0"
+
+# runs: just country de, just eu, just europe, just europe-central
+default version=version:
+    just _build {{version}}
+    just _tag {{version}}
+    just _push {{version}}
+
+_build version=version:
+    docker build -f src/main/docker/Dockerfile -t flair/ner:{{version}} --build-arg VERSION={{version}} .
+    docker tag flair/ner:{{version}} flair/ner:latest
+
+_tag version=version:
+    docker tag flair/ner:{{version}} docker.texttechnologylab.org/flair/ner:{{version}}
+    docker tag flair/ner:{{version}} docker.texttechnologylab.org/flair/ner:latest
+
+_push version=version:
+    docker push docker.texttechnologylab.org/flair/ner:{{version}}
+    docker push docker.texttechnologylab.org/flair/ner:latest

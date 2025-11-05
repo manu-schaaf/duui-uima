@@ -3,11 +3,11 @@ import math
 import os
 import sys
 from functools import lru_cache
-from typing import Final, Dict, List, Optional, Iterable, Callable, TypeVar
+from typing import Callable, Dict, Final, Iterable, List, Optional, TypeVar
 
 import flair
 from fastapi import FastAPI, Response
-from fastapi.responses import PlainTextResponse, JSONResponse
+from fastapi.responses import JSONResponse, PlainTextResponse
 from flair.data import Sentence
 from flair.models import SequenceTagger
 from pydantic import BaseModel
@@ -49,8 +49,8 @@ with open("dkpro-core-types.xml", "rb") as f:
     type_system = f.read()
 
 lang_code_to_model_map: Final[Dict[str, str]] = {
-    # NER (4-class) 	English 	Conll-03 	93.03 (F1)
-    "en": "flair/ner-english",
+    # NER (4-class) 	English / Multilingual 	Conll-03 	94.09 (F1) 	(large model)
+    "en": "flair/ner-english-large",
     # NER (4-class) 	English 	Conll-03 	93.03 (F1)
     "en-ner": "flair/ner-english",
     # NER (4-class) 	English 	Conll-03 	92.75 (F1) 	(fast model)
@@ -73,8 +73,8 @@ lang_code_to_model_map: Final[Dict[str, str]] = {
     "da": "flair/ner-danish",
     # NER (4-class) 	Danish 	Danish NER dataset 		AmaliePauli
     "da-ner": "flair/ner-danish",
-    # NER (4-class) 	German 	Conll-03 	87.94 (F1)
-    "de": "flair/ner-german",
+    # NER (4-class) 	German / Multilingual 	Conll-03 	92.31 (F1)
+    "de": "flair/ner-german-large",
     # NER (4-class) 	German 	Conll-03 	87.94 (F1)
     "de-ner": "flair/ner-german",
     # NER (4-class) 	German / Multilingual 	Conll-03 	92.31 (F1)
@@ -91,7 +91,8 @@ lang_code_to_model_map: Final[Dict[str, str]] = {
     "es": "flair/ner-spanish-large",
     # NER (4-class) 	Spanish 	CoNLL-03 	90.54 (F1) 	mhham
     "es-ner": "flair/ner-spanish-large",
-    "nl": "flair/ner-dutch",  # NER (4-class) 	Dutch 	CoNLL 2002 	92.58 (F1)
+    # NER (4-class) 	Dutch 	Conll-03 	95.25 (F1)
+    "nl": "flair/ner-dutch-large",
     # NER (4-class) 	Dutch 	CoNLL 2002 	92.58 (F1)
     "nl-ner": "flair/ner-dutch",
     # NER (4-class) 	Dutch 	Conll-03 	95.25 (F1)
@@ -103,8 +104,7 @@ lang_code_to_model_map: Final[Dict[str, str]] = {
     # NER (4-class) 	Ukrainian 	NER-UK dataset 	86.05 (F1) 	dchaplinsky
     "uk-ner": "dchaplinsky/flair-uk-ner",
 }
-supported_languages: Final[List[str]] = list(
-    sorted(lang_code_to_model_map.keys()))
+supported_languages: Final[List[str]] = list(sorted(lang_code_to_model_map.keys()))
 
 
 # Return Lua communication script
@@ -188,6 +188,7 @@ ner_tag_map: Final[Dict[str, str]] = {
     "LOC": "Location",
     "ORG": "Organization",
     "PER": "Person",
+    "MISC": "NamedEntity",
 }
 
 
@@ -209,7 +210,7 @@ class DkproNer(BaseModel):
 
 
 def get_ner_type(o_tag: str) -> str:
-    if o_tag in ner_tag_map:
+    if o_tag.upper() in ner_tag_map:
         return ner_types[ner_tag_map[o_tag]]
 
     tag = "".join(map(str.title, o_tag.split("_")))
@@ -234,11 +235,10 @@ def get_documentation() -> TextImagerDocumentation:
     )
 
     documentation = TextImagerDocumentation(
-        annotator_name="Flair POS - DUII",
-        version="0.0.1",
+        annotator_name="Flair NER - DUII",
+        version="0.2.0",
         implementation_lang="Python",
-        meta={"python_version": sys.version,
-              "flair_version": flair.__version__},
+        meta={"python_version": sys.version, "flair_version": flair.__version__},
         docker_container_id="docker.texttechnologylab.org/flair/pos:latest",
         parameters={
             "language": "de",
@@ -258,7 +258,7 @@ class TextImagerRequest(BaseModel):
     text: str
     language: str
     sentences: List[DkproSentence]
-    optional_tag_map: Optional[Dict[str, str]]
+    optional_tag_map: Optional[Dict[str, str]] = None
 
 
 class TextImagerResponse(BaseModel):
@@ -273,7 +273,7 @@ def load_model(lang: str) -> SequenceTagger:
 def batcher(iterable: List[T], batch_size=BATCH_SIZE) -> Iterable[List[T]]:
     _len = len(iterable)
     for start in range(0, _len, batch_size):
-        yield list(iterable[start:start + batch_size])
+        yield list(iterable[start : start + batch_size])
 
 
 def flatten(iterable: Iterable[Iterable[T]]) -> Iterable[T]:
@@ -304,30 +304,8 @@ def post_process(request: TextImagerRequest):
                 )
             },
         )
-    model = load_model(lang_code_to_model_map[language])
-    text = request.text
-    if request.optional_tag_map:
-        tag_map = request.optional_tag_map
 
-        def tag_lookup(key):
-            return tag_map.get(key, get_ner_type(key))
-
-    else:
-        tag_lookup = get_ner_type
-
-    if request.sentences:
-        total_batches = math.ceil(len(request.sentences) / BATCH_SIZE * 1.)
-
-        def process_verbose(idx, batch: List[T]) -> Iterable[T]:
-            logger.info(f"Processing batch {idx}/{total_batches}")
-            return process_batch(model, text, batch, tag_lookup)
-
-        tags = list(flatten(
-            process_verbose(idx, batch)
-            for idx, batch in enumerate(batcher(request.sentences, BATCH_SIZE), start=1)
-        ))
-        return TextImagerResponse(tags=tags)
-    else:
+    if not request.sentences:
         return JSONResponse(
             status_code=400,
             content={
@@ -335,12 +313,35 @@ def post_process(request: TextImagerRequest):
             },
         )
 
+    model = load_model(lang_code_to_model_map[language])
+    if request.optional_tag_map:
+        tag_map = request.optional_tag_map
+
+        def tag_lookup(o_tag: str) -> str:
+            return tag_map.get(o_tag) or get_ner_type(o_tag)
+
+    else:
+        tag_lookup = get_ner_type
+
+    total_batches = math.ceil(len(request.sentences) / BATCH_SIZE * 1.0)
+
+    def process_verbose(idx, batch: List[DkproSentence]) -> Iterable[DkproNer]:
+        logger.info(f"Processing batch {idx}/{total_batches}")
+        return process_batch(model, batch, tag_lookup)
+
+    tags = list(
+        flatten(
+            process_verbose(idx, batch)
+            for idx, batch in enumerate(batcher(request.sentences, BATCH_SIZE), start=1)
+        )
+    )
+    return TextImagerResponse(tags=tags)
+
 
 def process_batch(
-        model: SequenceTagger,
-        text: str,
-        batch: List[DkproSentence],
-        tag_lookup: Callable[[str], str]
+    model: SequenceTagger,
+    batch: List[DkproSentence],
+    tag_lookup: Callable[[str], str],
 ) -> Iterable[DkproNer]:
     sentences: List[Sentence] = [
         Sentence(

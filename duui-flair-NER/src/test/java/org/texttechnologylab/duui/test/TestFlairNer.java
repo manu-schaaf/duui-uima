@@ -12,6 +12,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
 import org.luaj.vm2.LuaError;
 import org.texttechnologylab.DockerUnifiedUIMAInterface.DUUIComposer;
+import org.texttechnologylab.DockerUnifiedUIMAInterface.exception.PipelineComponentException;
 import org.texttechnologylab.DockerUnifiedUIMAInterface.driver.DUUIRemoteDriver;
 import org.texttechnologylab.DockerUnifiedUIMAInterface.lua.DUUILuaContext;
 
@@ -55,9 +56,9 @@ class TestSuccessNer {
         assert annotations.size() > 0;
         for (Annotation annotation : annotations) {
             StringBuffer stringBuffer = new StringBuffer();
-            annotation.prettyPrint(2, 0, stringBuffer, true);
-            System.out.print(stringBuffer);
-            System.out.println("  text: \"" + annotation.getCoveredText() + "\"\n");
+            annotation.prettyPrint(0, 4, stringBuffer, true);
+            System.out.println(stringBuffer);
+            System.out.printf("    text: \"%s\"%n", annotation.getCoveredText());
         }
     }
 
@@ -126,7 +127,7 @@ class TestFailureNer {
         Sentence sentence = new Sentence(jCas, 0, 39);
         sentence.addToIndexes(jCas);
 
-        assertThrows(LuaError.class, () -> composer.run(jCas));
+        assertThrows(PipelineComponentException.class, () -> composer.run(jCas));
 
         composer.shutdown();
     }
@@ -155,7 +156,7 @@ class TestFailureNer {
         Sentence sentence = new Sentence(jCas, 0, 39);
         sentence.addToIndexes(jCas);
 
-        assertThrows(InvalidObjectException.class, () -> composer.run(jCas));
+        assertThrows(PipelineComponentException.class, () -> composer.run(jCas));
 
         composer.shutdown();
     }

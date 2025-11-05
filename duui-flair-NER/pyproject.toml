@@ -1,0 +1,13 @@
+[project]
+name = "duui-flair-ner"
+version = "0.2.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi[standard]>=0.121.0",
+    "flair>=0.15.1",
+    "pydantic-settings>=2.11.0",
+    "transformers[hf-xet]>=4.57.1",
+    "uvicorn>=0.38.0",
+]

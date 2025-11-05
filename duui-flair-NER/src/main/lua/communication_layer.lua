@@ -62,9 +62,9 @@ function deserialize(inputCas, inputStream)
 
     -- Add Taxa
     for i, tag in ipairs(results["tags"]) do
+        local annotation
         local tag_type = tag["ner_type"]
-        local annotation = nil
-        if not tag_type then
+        if tag_type ~= nil and tag_type ~= "" then
             annotation = luajava.newInstance(tag_type, inputCas)
         else
             annotation = luajava.newInstance("de.tudarmstadt.ukp.dkpro.core.api.ner.type.NamedEntity", inputCas)

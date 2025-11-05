@@ -6,23 +6,26 @@
 
     <groupId>org.hucompute.duui.test</groupId>
     <artifactId>flair-ner</artifactId>
-    <version>0.0.1</version>
+    <version>0.2.0</version>
 
     <properties>
-        <maven.compiler.source>11</maven.compiler.source>
-        <maven.compiler.target>11</maven.compiler.target>
-        <ttlab.duui.version>f68ca579ab553074f76d061623dc9b00cf508276</ttlab.duui.version>
-        <ttlab.textimager.typesystem.version>b10db8275163d19d63b9512cc20ca5872e52499b</ttlab.textimager.typesystem.version>
-        <ttlab.typesystem.version>29fe3e0ab56c14b1e8af402b3df25d91e1f41d94</ttlab.typesystem.version>
+        <maven.compiler.source>21</maven.compiler.source>
+        <maven.compiler.target>21</maven.compiler.target>
     </properties>
 
     <build>
         <pluginManagement>
           <plugins>
             <plugin>
-              <groupId>org.apache.maven.plugins</groupId>
-              <artifactId>maven-surefire-plugin</artifactId>
-              <version>3.0.0</version>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-surefire-plugin</artifactId>
+                <version>3.5.3</version>
+                <configuration>
+                    <argLine>
+                        --illegal-access=permit
+                        --add-opens java.base/java.util=ALL-UNNAMED
+                    </argLine>
+                </configuration>
             </plugin>
           </plugins>
         </pluginManagement>
@@ -30,33 +33,34 @@
 
     <repositories>
         <repository>
-            <id>jitpack.io</id>
-            <url>https://jitpack.io</url>
+            <id>central</id>
+            <url>https://repo.maven.apache.org/maven2</url>
+        </repository>
+        <repository>
+            <id>github</id>
+            <url>https://maven.pkg.github.com/texttechnologylab/*</url>
+            <snapshots>
+                <enabled>true</enabled>
+            </snapshots>
         </repository>
     </repositories>
 
     <dependencies>
-        <!--<dependency>
-            <groupId>com.github.texttechnologylab</groupId>
-            <artifactId>DockerUnifiedUIMAInterface</artifactId>
-            <version>${ttlab.duui.version}</version>
-        </dependency>-->
         <dependency>
             <groupId>org.texttechnologylab</groupId>
             <artifactId>DockerUnifiedUIMAInterface</artifactId>
-            <version>1.0</version>
+            <version>1.5.4</version>
+            <exclusions>
+                <exclusion>
+                    <groupId>com.github.texttechnologylab</groupId>
+                    <artifactId>UIMATypeSystem</artifactId>
+                </exclusion>
+            </exclusions>
         </dependency>
-
         <dependency>
-            <groupId>com.github.texttechnologylab.textimager-uima</groupId>
-            <artifactId>textimager-uima-types</artifactId>
-            <version>${ttlab.textimager.typesystem.version}</version>
-        </dependency>
-
-        <dependency>
-            <groupId>com.github.texttechnologylab</groupId>
-            <artifactId>UIMATypeSystem</artifactId>
-            <version>${ttlab.typesystem.version}</version>
+            <groupId>org.texttechnologylab.annotation</groupId>
+            <artifactId>typesystem</artifactId>
+            <version>3.0.13</version>
         </dependency>
 
         <dependency>
@@ -65,6 +69,11 @@
             <version>5.8.2</version>
             <scope>test</scope>
         </dependency>
-
+        <dependency>
+            <groupId>org.slf4j</groupId>
+            <artifactId>slf4j-simple</artifactId>
+            <version>1.7.25</version>
+            <scope>test</scope>
+        </dependency>
     </dependencies>
 </project>
